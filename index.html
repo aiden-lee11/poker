@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebSocket Chat</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    #chat {
+      width: 100%;
+      max-width: 600px;
+      height: 300px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 10px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+    }
+    #chat p {
+      margin: 0;
+      padding: 5px;
+      border-radius: 5px;
+    }
+    .user {
+      background-color: #d1f7c4;
+    }
+    .other {
+      background-color: #f0f0f0;
+    }
+    #inputBox {
+      display: flex;
+    }
+    #messageInput {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      margin-right: 10px;
+    }
+    #sendButton {
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    #sendButton:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <h1>WebSocket Chat</h1>
+  <div id="chat"></div>
+  <div id="inputBox">
+    <input type="text" id="messageInput" placeholder="Type your message..." />
+    <button id="sendButton">Send</button>
+  </div>
+
+  <script>
+    const chatBox = document.getElementById('chat');
+    const messageInput = document.getElementById('messageInput');
+    const sendButton = document.getElementById('sendButton');
+
+    // Establish WebSocket connection
+    const socket = new WebSocket('ws://localhost:8080/ws');
+
+    // Listen for messages from the server
+    socket.onmessage = (event) => {
+      const message = event.data;
+      const p = document.createElement('p');
+      p.textContent = message;
+      p.classList.add('other');
+      chatBox.appendChild(p);
+      chatBox.scrollTop = chatBox.scrollHeight; // Auto-scroll
+    };
+
+    // Send message to server
+    sendButton.addEventListener('click', () => {
+      const message = messageInput.value;
+      if (message.trim() !== '') {
+        socket.send(message);
+        const p = document.createElement('p');
+        p.textContent = message;
+        p.classList.add('user');
+        chatBox.appendChild(p);
+        chatBox.scrollTop = chatBox.scrollHeight; // Auto-scroll
+        messageInput.value = ''; // Clear input
+      }
+    });
+
+    // Pressing Enter sends the message
+    messageInput.addEventListener('keypress', (event) => {
+      if (event.key === 'Enter') {
+        sendButton.click();
+      }
+    });
+  </script>
+</body>
+</html>
+
