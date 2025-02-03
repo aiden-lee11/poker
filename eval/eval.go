@@ -5,8 +5,13 @@ import (
 	"sort"
 )
 
-// Card will be a byte with vals | cdhsrrrr |
-type Card byte
+// Ported version of Paul Senzee's hand evaluator found at https://github.com/christophschmalhofer/poker/blob/master/XPokerEval/XPokerEval.CactusKev.PerfectHash/fast_eval.cpp
+
+// Card representation
+// +--------+--------+--------+--------+
+// |xxxbbbbb|bbbbbbbb|cdhsrrrr|xxpppppp|
+// +--------+--------+--------+--------+
+type Card int32
 type HandStrength int
 
 const (
@@ -65,9 +70,6 @@ func findBestHand(combinations []Hand) Hand {
 		if hand.Strength > resHand.Strength {
 			resHand = hand
 		}
-		// } else if hand.Strength == resHand.Strength {
-		// 	resHand = hand.EvaluateEqualStrength(resHand)
-		// }
 	}
 
 	return resHand
@@ -75,72 +77,43 @@ func findBestHand(combinations []Hand) Hand {
 
 func (hand *Hand) sortHand() {
 	sort.Slice(hand.Cards, func(i, j int) bool {
-		return hand.Cards[i]&0x0F < hand.Cards[j]&0x0F
+		return hand.Cards[i]&0x00000F00 < hand.Cards[j]&0x00000F00
 	})
 }
 
 // func (hand *Hand) EvaluateEqualStrength(other Hand) Hand {
-// 	switch hand.Strength {
-// 	case HighCard:
-// 		for i := len(hand.Cards); i >= 0; i-- {
-// 			if hand.Cards[i] > other.Cards[i] {
-// 				return *hand
-// 			} else if other.Cards[i] > hand.Cards[i] {
-// 				return other
-// 			}
-// 		}
-// 	case OnePair:
-
-// 	}
 // }
 
-func (hand *Hand) EvaluateHand() {
+func (hand *Hand) getFlushStraightIndex() int16 {
+	return int16((hand.Cards[0] | hand.Cards[1] | hand.Cards[2] | hand.Cards[3] | hand.Cards[4]) >> 16)
+}
+
+func (hand *Hand) getPrime() uint {
+	return uint((hand.Cards[0] & 0xFF) * (hand.Cards[1] & 0xFF) * (hand.Cards[2] & 0xFF) * (hand.Cards[3] & 0xFF) * (hand.Cards[4] & 0xFF))
+}
+
+func (hand *Hand) EvaluateHand() int16 {
+	q := hand.getFlushStraightIndex()
+
 	if hand.isFlush() {
-		if !hand.isStraight() {
-			hand.Strength = Flush
-			return
-		}
-
-		if hand.Cards[0]&0x09 != 0 {
-			hand.Strength = RoyalFlush
-			return
-		}
-		hand.Strength = StraightFlush
-		return
+		return Flushes[q]
+	}
+	if s := Unique5[q]; s != 0 {
+		return s
 	}
 
-	if hand.isNumOfAKind(4) {
-		hand.Strength = Quads
-		return
-	}
+	return HashValues[hashIndex(hand.getPrime())]
+}
 
-	if hand.isFullHouse() {
-		hand.Strength = FullHouse
-		return
-	}
-
-	if hand.isStraight() {
-		hand.Strength = Straight
-		return
-	}
-
-	if hand.isNumOfAKind(3) {
-		hand.Strength = Trips
-		return
-	}
-
-	if hand.isTwoPair() {
-		hand.Strength = TwoPair
-		return
-	}
-
-	if hand.isNumOfAKind(2) {
-		hand.Strength = OnePair
-		return
-	}
-
-	hand.Strength = HighCard
-	return
+func hashIndex(prime uint) uint {
+	var a, b uint
+	prime += 0xe91aaa35
+	prime ^= prime >> 16
+	prime += prime << 8
+	prime ^= prime >> 4
+	b = (prime >> 8) & 0x1ff
+	a = (prime + (prime << 2)) >> 19
+	return a ^ uint(HashAdjust[b])
 }
 
 func (hand *Hand) isFlush() bool {
@@ -148,59 +121,5 @@ func (hand *Hand) isFlush() bool {
 	for _, card := range hand.Cards[1:] {
 		res &= card
 	}
-	return res&0xF0 != 0
-}
-
-func (hand *Hand) isStraight() bool {
-	for i := 0; i < len(hand.Cards)-1; i++ {
-		if hand.Cards[i] != hand.Cards[i+1]-1 {
-			return false
-		}
-	}
-	return true
-}
-
-// Need to fully calculate hand first to ensure that trips dont count as 2 of a kind
-func (hand *Hand) isNumOfAKind(num int) bool {
-
-	rankCount := make(map[Card]int)
-
-	for _, card := range hand.Cards {
-		rank := card & 0x0F
-		rankCount[rank]++
-	}
-
-	for _, card := range hand.Cards {
-		rank := card & 0x0F
-		if rankCount[rank] == num {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (hand *Hand) isFullHouse() bool {
-	return hand.isNumOfAKind(3) && hand.isNumOfAKind(2)
-}
-
-// Ensure that the two pairs are distinct and not the same ie 77 not double counted would need 77 and 88 etc
-func (hand *Hand) isTwoPair() bool {
-	rankCount := make(map[Card]int)
-
-	for _, card := range hand.Cards {
-		rank := card & 0x0F
-		rankCount[rank]++
-	}
-
-	res := 0
-	for _, card := range hand.Cards {
-		rank := card & 0x0F
-		if rankCount[rank] == 2 {
-			res += 1
-			rankCount[rank] = 0
-		}
-	}
-
-	return res == 2
+	return res&0x0000F000 != 0
 }
