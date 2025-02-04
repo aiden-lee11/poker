@@ -11,11 +11,16 @@ import (
 // +--------+--------+--------+--------+
 // |xxxbbbbb|bbbbbbbb|cdhsrrrr|xxpppppp|
 // +--------+--------+--------+--------+
+// xxxAKQJT 98765432 CDHSrrrr xxPPPPPP
+
 type Card int32
-type HandStrength int
+
+type Hand struct {
+	Cards []Card
+}
 
 const (
-	HighCard HandStrength = iota
+	HighCard int = iota
 	OnePair
 	TwoPair
 	Trips
@@ -27,10 +32,11 @@ const (
 	RoyalFlush
 )
 
-type Hand struct {
-	Cards    []Card
-	Strength HandStrength
-}
+const (
+	rankMask  = 0x00000F00
+	suitMask  = 0x0000F000
+	primeMask = 0x000000FF
+)
 
 // func for generating combos, evaluating a single 5 card hand strength, evaluating best 5 card hand out 7
 
@@ -48,7 +54,7 @@ func GenerateCombinations(cards []Card) []Hand {
 	helper = func(start int, combo []Card) {
 		if len(combo) == 5 {
 			hand := Hand{Cards: combo}
-			hand.sortHand()
+			hand.SortHand()
 			combos = append(combos, hand)
 			return
 		}
@@ -62,12 +68,12 @@ func GenerateCombinations(cards []Card) []Hand {
 	return combos
 }
 
-func findBestHand(combinations []Hand) Hand {
-	var resHand Hand
+func FindBestHand(combinations []Hand) Hand {
+	resHand := combinations[0]
 
-	for _, hand := range combinations {
-		hand.EvaluateHand()
-		if hand.Strength > resHand.Strength {
+	for i := range combinations[1:] {
+		hand := combinations[i]
+		if curStrength := hand.EvaluateHand(); curStrength > resHand.EvaluateHand() {
 			resHand = hand
 		}
 	}
@@ -75,34 +81,59 @@ func findBestHand(combinations []Hand) Hand {
 	return resHand
 }
 
-func (hand *Hand) sortHand() {
-	sort.Slice(hand.Cards, func(i, j int) bool {
-		return hand.Cards[i]&0x00000F00 < hand.Cards[j]&0x00000F00
-	})
+func HandRank(val int16) int {
+	if val > 6185 {
+		return (HighCard)
+	} // 1277 high card
+	if val > 3325 {
+		return (OnePair)
+	} // 2860 one pair
+	if val > 2467 {
+		return (TwoPair)
+	} //  858 two pair
+	if val > 1609 {
+		return (Trips)
+	} //  858 three-kind
+	if val > 1599 {
+		return (Straight)
+	} //   10 straights
+	if val > 322 {
+		return (Flush)
+	} // 1277 flushes
+	if val > 166 {
+		return (FullHouse)
+	} //  156 full house
+	if val > 10 {
+		return (Quads)
+	} //  156 four-kind
+	return (StraightFlush) //   10 straight-flushes
 }
 
-// func (hand *Hand) EvaluateEqualStrength(other Hand) Hand {
-// }
+func (hand *Hand) SortHand() {
+	sort.Slice(hand.Cards, func(i, j int) bool {
+		return hand.Cards[i]&rankMask < hand.Cards[j]&rankMask
+	})
+}
 
 func (hand *Hand) getFlushStraightIndex() int16 {
 	return int16((hand.Cards[0] | hand.Cards[1] | hand.Cards[2] | hand.Cards[3] | hand.Cards[4]) >> 16)
 }
 
 func (hand *Hand) getPrime() uint {
-	return uint((hand.Cards[0] & 0xFF) * (hand.Cards[1] & 0xFF) * (hand.Cards[2] & 0xFF) * (hand.Cards[3] & 0xFF) * (hand.Cards[4] & 0xFF))
+	return uint((hand.Cards[0] & primeMask) * (hand.Cards[1] & primeMask) * (hand.Cards[2] & primeMask) * (hand.Cards[3] & primeMask) * (hand.Cards[4] & primeMask))
 }
 
-func (hand *Hand) EvaluateHand() int16 {
+func (hand *Hand) EvaluateHand() int {
 	q := hand.getFlushStraightIndex()
 
 	if hand.isFlush() {
-		return Flushes[q]
+		return HandRank(Flushes[q])
 	}
 	if s := Unique5[q]; s != 0 {
-		return s
+		return HandRank(s)
 	}
 
-	return HashValues[hashIndex(hand.getPrime())]
+	return HandRank(HashValues[hashIndex(hand.getPrime())])
 }
 
 func hashIndex(prime uint) uint {
@@ -121,5 +152,5 @@ func (hand *Hand) isFlush() bool {
 	for _, card := range hand.Cards[1:] {
 		res &= card
 	}
-	return res&0x0000F000 != 0
+	return res&suitMask != 0
 }
