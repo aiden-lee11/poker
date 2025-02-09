@@ -20,6 +20,11 @@ type Table struct {
 	PotSize        int
 }
 
+// Need to incorporate this type of player hand struct with our eval
+// func (player *Player) evalHand() int {
+// 	cards :=
+// }
+
 func (table *Table) ShuffleDeck() {
 	shuffledDeck := make([]Card, len(BaseStringDeck))
 	copy(shuffledDeck, BaseStringDeck)
@@ -41,6 +46,22 @@ func (table *Table) DistributeCards() {
 	table.popCardFromDeck(numPlayers * 2)
 }
 
+func (table *Table) ShowFlopCards() {
+	table.CommunityCards = append(table.CommunityCards, table.Deck[1:4]...)
+
+	table.popCardFromDeck(4)
+}
+
+func (table *Table) ShowTurnCard() {
+	table.CommunityCards = append(table.CommunityCards, table.Deck[1])
+	table.popCardFromDeck(2)
+}
+
+func (table *Table) ShowRiverCard() {
+	table.CommunityCards = append(table.CommunityCards, table.Deck[1])
+	table.popCardFromDeck(2)
+}
+
 func (table *Table) AddPlayer(stackSize int) {
 	table.Players = append(table.Players, Player{StackSize: stackSize})
 }
@@ -48,10 +69,3 @@ func (table *Table) AddPlayer(stackSize int) {
 func (table *Table) popCardFromDeck(numToPop int) {
 	table.Deck = table.Deck[numToPop:]
 }
-
-// // table package?
-// func bet()
-
-// func fold()
-
-// func check()
