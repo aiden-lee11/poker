@@ -2,6 +2,7 @@ package eval
 
 import (
 	"fmt"
+	"log"
 	"sort"
 )
 
@@ -39,46 +40,63 @@ const (
 )
 
 // func for generating combos, evaluating a single 5 card hand strength, evaluating best 5 card hand out 7
-
-// Takes in 7 cards and returns all possible 5 card hands, essentially 7 chose 5
-// Thanks cesar :)
 func GenerateCombinations(cards []Card) []Hand {
 	if len(cards) != 7 {
-		fmt.Println("Expected 7 cards in the combo generator got: ", len(cards))
+		fmt.Println("Expected 7 cards in the combo generator, got:", len(cards))
 		return nil
 	}
 
 	var combos []Hand
 
-	var helper func(start int, combo []Card)
-	helper = func(start int, combo []Card) {
-		if len(combo) == 5 {
-			hand := Hand{Cards: combo}
-			hand.SortHand()
-			combos = append(combos, hand)
-			return
+	for _, indices := range comboIndices {
+		var combo []Card
+		for _, index := range indices {
+			combo = append(combo, cards[index])
 		}
 
-		for i := start; i < 7; i++ {
-			helper(i+1, append(combo, cards[i]))
-		}
+		hand := Hand{Cards: combo}
+		combos = append(combos, hand)
 	}
 
-	helper(0, []Card{})
 	return combos
 }
 
+var comboIndices = [][]int{
+	{0, 1, 2, 3, 4}, {0, 1, 2, 3, 5}, {0, 1, 2, 3, 6},
+	{0, 1, 2, 4, 5}, {0, 1, 2, 4, 6}, {0, 1, 2, 5, 6},
+	{0, 1, 3, 4, 5}, {0, 1, 3, 4, 6}, {0, 1, 3, 5, 6},
+	{0, 1, 4, 5, 6}, {0, 2, 3, 4, 5}, {0, 2, 3, 4, 6},
+	{0, 2, 3, 5, 6}, {0, 2, 4, 5, 6}, {0, 3, 4, 5, 6},
+	{1, 2, 3, 4, 5}, {1, 2, 3, 4, 6}, {1, 2, 3, 5, 6},
+	{1, 2, 4, 5, 6}, {1, 3, 4, 5, 6}, {2, 3, 4, 5, 6},
+}
+
 func FindBestHand(combinations []Hand) Hand {
+	// Assuming that combinations is not empty, otherwise you would want to check that first
+	if len(combinations) != 21 {
+		log.Fatalf("Expected length of 21 combinations got %d", len(combinations))
+	}
 	resHand := combinations[0]
 
-	for i := range combinations[1:] {
+	for i := 1; i < len(combinations); i++ {
 		hand := combinations[i]
+		fmt.Printf("resHand: %v\n", resHand)
+		fmt.Printf("hand: %v\n", hand)
+
 		if curStrength := hand.EvaluateHand(); curStrength > resHand.EvaluateHand() {
 			resHand = hand
 		}
 	}
 
 	return resHand
+}
+
+func EvalHand(hand []Card) (Hand, int) {
+	combinations := GenerateCombinations(hand)
+
+	bestHand := FindBestHand(combinations)
+
+	return bestHand, bestHand.EvaluateHand()
 }
 
 func HandRank(val int16) int {
@@ -109,12 +127,6 @@ func HandRank(val int16) int {
 	return (StraightFlush) //   10 straight-flushes
 }
 
-func (hand *Hand) SortHand() {
-	sort.Slice(hand.Cards, func(i, j int) bool {
-		return hand.Cards[i]&rankMask < hand.Cards[j]&rankMask
-	})
-}
-
 func (hand *Hand) getFlushStraightIndex() int16 {
 	return int16((hand.Cards[0] | hand.Cards[1] | hand.Cards[2] | hand.Cards[3] | hand.Cards[4]) >> 16)
 }
@@ -133,6 +145,8 @@ func (hand *Hand) EvaluateHand() int {
 		return HandRank(s)
 	}
 
+	fmt.Println("here")
+	fmt.Printf("hand.Cards: %v\n", hand.Cards)
 	return HandRank(HashValues[hashIndex(hand.getPrime())])
 }
 
@@ -144,6 +158,8 @@ func hashIndex(prime uint) uint {
 	prime ^= prime >> 4
 	b = (prime >> 8) & 0x1ff
 	a = (prime + (prime << 2)) >> 19
+	fmt.Printf("a: %v\n", a)
+	fmt.Printf("b: %v\n", b)
 	return a ^ uint(HashAdjust[b])
 }
 
@@ -153,4 +169,13 @@ func (hand *Hand) isFlush() bool {
 		res &= card
 	}
 	return res&suitMask != 0
+}
+
+func (hand *Hand) SortHand() {
+	sortedCards := make([]Card, len(hand.Cards))
+	copy(sortedCards, hand.Cards)
+	sort.Slice(sortedCards, func(i, j int) bool {
+		return sortedCards[i]&rankMask < sortedCards[j]&rankMask
+	})
+	hand.Cards = sortedCards
 }
