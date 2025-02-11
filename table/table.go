@@ -1,7 +1,9 @@
 package table
 
 import (
+	"fmt"
 	"math/rand"
+	"poker/eval"
 )
 
 type Card string
@@ -10,7 +12,7 @@ type Player struct {
 	StackSize   int
 	HoleCards   [2]Card
 	PlayingHand bool
-	// Position    int
+	Table       *Table
 }
 
 type Table struct {
@@ -21,9 +23,33 @@ type Table struct {
 }
 
 // Need to incorporate this type of player hand struct with our eval
-// func (player *Player) evalHand() int {
-// 	cards :=
-// }
+// only call this after flop should make other func for preflop vals
+func (player *Player) EvalHand() (eval.Hand, int) {
+	if player.Table == nil {
+		fmt.Println("Player is not associated with a table.")
+		return eval.Hand{}, 0
+	}
+
+	handString := append([]Card{}, player.HoleCards[:]...)
+	handString = append(handString, player.Table.CommunityCards...)
+
+	handInts := make([]eval.Card, len(handString))
+	for i, card := range handString {
+		handInts[i] = eval.Card(CardToBits[card])
+	}
+
+	fmt.Printf("handString: %v\n", handString)
+
+	// fmt.Print("handInts: [\n")
+	// for i, card := range handInts {
+	// 	if i > 0 {
+	// 		fmt.Print(", \n")
+	// 	}
+	// 	fmt.Printf("0b%032b", card)
+	// }
+	// fmt.Println("]")
+	return eval.EvalHand(handInts)
+}
 
 func (table *Table) ShuffleDeck() {
 	shuffledDeck := make([]Card, len(BaseStringDeck))
@@ -63,7 +89,7 @@ func (table *Table) ShowRiverCard() {
 }
 
 func (table *Table) AddPlayer(stackSize int) {
-	table.Players = append(table.Players, Player{StackSize: stackSize})
+	table.Players = append(table.Players, Player{StackSize: stackSize, Table: table})
 }
 
 func (table *Table) popCardFromDeck(numToPop int) {

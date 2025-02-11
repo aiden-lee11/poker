@@ -80,8 +80,6 @@ func FindBestHand(combinations []Hand) Hand {
 
 	for i := 1; i < len(combinations); i++ {
 		hand := combinations[i]
-		fmt.Printf("resHand: %v\n", resHand)
-		fmt.Printf("hand: %v\n", hand)
 
 		if curStrength := hand.EvaluateHand(); curStrength > resHand.EvaluateHand() {
 			resHand = hand
@@ -131,8 +129,12 @@ func (hand *Hand) getFlushStraightIndex() int16 {
 	return int16((hand.Cards[0] | hand.Cards[1] | hand.Cards[2] | hand.Cards[3] | hand.Cards[4]) >> 16)
 }
 
-func (hand *Hand) getPrime() uint {
-	return uint((hand.Cards[0] & primeMask) * (hand.Cards[1] & primeMask) * (hand.Cards[2] & primeMask) * (hand.Cards[3] & primeMask) * (hand.Cards[4] & primeMask))
+func (hand *Hand) getPrime() uint32 {
+	return uint32((hand.Cards[0] & primeMask) *
+		(hand.Cards[1] & primeMask) *
+		(hand.Cards[2] & primeMask) *
+		(hand.Cards[3] & primeMask) *
+		(hand.Cards[4] & primeMask))
 }
 
 func (hand *Hand) EvaluateHand() int {
@@ -145,22 +147,18 @@ func (hand *Hand) EvaluateHand() int {
 		return HandRank(s)
 	}
 
-	fmt.Println("here")
-	fmt.Printf("hand.Cards: %v\n", hand.Cards)
 	return HandRank(HashValues[hashIndex(hand.getPrime())])
 }
 
-func hashIndex(prime uint) uint {
-	var a, b uint
+func hashIndex(prime uint32) uint32 {
+	var a, b uint32
 	prime += 0xe91aaa35
 	prime ^= prime >> 16
 	prime += prime << 8
 	prime ^= prime >> 4
 	b = (prime >> 8) & 0x1ff
 	a = (prime + (prime << 2)) >> 19
-	fmt.Printf("a: %v\n", a)
-	fmt.Printf("b: %v\n", b)
-	return a ^ uint(HashAdjust[b])
+	return a ^ uint32(HashAdjust[b])
 }
 
 func (hand *Hand) isFlush() bool {
