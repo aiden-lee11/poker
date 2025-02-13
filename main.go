@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"sync"
+
+	"poker/table"
 
 	"github.com/gorilla/websocket"
 )
@@ -15,24 +17,14 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-type Client struct {
-	hub  *Hub
-	conn *websocket.Conn
-	send chan []byte
-}
-
-type Hub struct {
-	clients    map[*Client]bool
-	broadcast  chan Message
-	register   chan *Client
-	unregister chan *Client
-	mu         sync.Mutex
-}
-
-type Message struct {
-	sender  *Client
-	content []byte
-}
+const (
+	JoinGame      = "join"
+	Bet           = "bet"
+	Check         = "check"
+	Fold          = "fold"
+	DealCards     = "deal"
+	EvaluateHands = "evaluate"
+)
 
 func initHub() *Hub {
 	return &Hub{
@@ -83,11 +75,72 @@ func (c *Client) readMessages(hub *Hub) {
 			log.Println("read error: ", err)
 			break
 		}
-		hub.broadcast <- Message{
-			sender:  c,
-			content: message,
+
+		var gameMessage GameMessage
+		err = json.Unmarshal(message, &gameMessage)
+
+		if err != nil {
+			log.Println("json read error: ", err)
+			break
+		}
+		// JoinGame      = "join"
+		// Bet           = "bet"
+		// Check         = "check"
+		// Fold          = "fold"
+		// DealCards     = "deal"
+		// EvaluateHands = "evaluate"
+		var playerID string
+		if payload, ok := gameMessage.Payload.(map[string]interface{}); ok {
+			if id, ok := payload["playerID"].(string); ok {
+				playerID = id
+			} else {
+				log.Println("no playerid in payload", gameMessage)
+			}
+		}
+
+		switch gameMessage.Type {
+		case JoinGame:
+			// do something need client to join game func idk
+			c.handleJoinGame(gameMessage.Payload)
+		case DealCards:
+			c.handleDealCards()
+		case EvaluateHands:
+			c.handleEvaluateHands()
+		case Bet:
+			c.handleBet(playerID, gameMessage.Payload)
+		case Check:
+			c.handleCheck(playerID, gameMessage.Payload)
+		case Fold:
+			c.handleFold(playerID, gameMessage.Payload)
+		default:
+			log.Println("how did you get here lol", gameMessage.Type)
 		}
 	}
+}
+
+func (c *Client) handleJoinGame(payload interface{}) {
+	var stackSize int
+	if payload, ok := payload.(map[string]interface{}); ok {
+		if payloadStackSize, ok := payload["stackSize"].(int); ok {
+			stackSize = payloadStackSize
+		} else {
+			log.Println("no playerid in payload", payload)
+		}
+	}
+
+	playerID := fmt.Sprintf("player-%d", len(c.hub.clients)+1)
+	playerData := table.Player{
+		StackSize: stackSize,
+		PlayerID:  playerID,
+	}
+
+	c.playerID = playerID
+	c.playerData = &playerData
+
+}
+
+func (c *Client) handleBet(playerID string, payload interface{}) {
+
 }
 
 func (c *Client) writeMessages() {
