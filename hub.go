@@ -22,6 +22,16 @@ func NewHub() *Hub {
 	}
 }
 
+func (h *Hub) safeSend(ch chan []byte, msg []byte) (ok bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			ok = false
+		}
+	}()
+	ch <- msg
+	return true
+}
+
 func (h *Hub) Run() {
 	for {
 		select {
@@ -31,18 +41,19 @@ func (h *Hub) Run() {
 			h.mu.Unlock()
 		case client := <-h.unregister:
 			h.mu.Lock()
-			delete(h.clients, client)
-			close(client.send)
+			// Only attempt to delete and close if still registered.
+			if _, exists := h.clients[client]; exists {
+				delete(h.clients, client)
+				close(client.send)
+			}
 			h.mu.Unlock()
 		case message := <-h.broadcast:
 			h.mu.Lock()
-
 			if message.Type == "public" {
 				for client := range h.clients {
 					if client.tableID == message.tableID {
-						select {
-						case client.send <- message.content:
-						default:
+						if !h.safeSend(client.send, message.content) {
+							// If sending fails (likely due to a closed channel), remove the client.
 							close(client.send)
 							delete(h.clients, client)
 						}
@@ -53,16 +64,13 @@ func (h *Hub) Run() {
 					if client.playerID == message.playerID && client.tableID == message.tableID {
 						fmt.Printf("client.playerID: %v\n", client.playerID)
 						fmt.Printf("message.content: %v\n", message.content)
-						select {
-						case client.send <- message.content:
-						default:
+						if !h.safeSend(client.send, message.content) {
 							close(client.send)
 							delete(h.clients, client)
 						}
 					}
 				}
 			}
-
 			h.mu.Unlock()
 		}
 	}

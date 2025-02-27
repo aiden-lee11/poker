@@ -15,6 +15,15 @@ type Player struct {
 	PlayingHand bool
 }
 
+type BettingRound int
+
+const (
+	PreFlop BettingRound = iota
+	Flop
+	Turn
+	River
+)
+
 type Table struct {
 	ID               string
 	Deck             []Card
@@ -22,8 +31,8 @@ type Table struct {
 	CommunityCards   []Card
 	PotSize          int
 	CurrentTurnIndex int
-	// i think this is how im gonna handle when orbits should be over
-	MostRecentRaise string
+	MostRecentRaise  string       // could be empty ("") when not set
+	Round            BettingRound // new field to track the current betting round
 }
 
 // Need to incorporate this type of player hand struct with our eval
@@ -77,7 +86,6 @@ func (table *Table) popCardFromDeck(numToPop int) {
 // for these we always index at 1 because we burn first
 func (table *Table) ShowFlopCards() {
 	table.CommunityCards = append(table.CommunityCards, table.Deck[1:4]...)
-
 	table.popCardFromDeck(4)
 }
 
@@ -89,4 +97,25 @@ func (table *Table) ShowTurnCard() {
 func (table *Table) ShowRiverCard() {
 	table.CommunityCards = append(table.CommunityCards, table.Deck[1])
 	table.popCardFromDeck(2)
+}
+
+// SetDefaultMostRecentRaise sets the default most recent raise based on the current betting round.
+// For the first round (PreFlop), we default to the big blind (assumed to be two positions from the dealer).
+// For other rounds, we default to the small blind (assumed to be one position from the dealer).
+func (t *Table) SetDefaultMostRecentRaise() {
+	numPlayers := len(t.Players)
+	if numPlayers == 0 {
+		return
+	}
+	if t.Round == PreFlop {
+		// Assume dealer is at CurrentTurnIndex:
+		// small blind: (CurrentTurnIndex + 1) % numPlayers
+		// big blind: (CurrentTurnIndex + 2) % numPlayers
+		bigBlindIndex := (t.CurrentTurnIndex + 2) % numPlayers
+		t.MostRecentRaise = t.Players[bigBlindIndex].PlayerID
+	} else {
+		// For other rounds, default to small blind (next player)
+		smallBlindIndex := (t.CurrentTurnIndex + 1) % numPlayers
+		t.MostRecentRaise = t.Players[smallBlindIndex].PlayerID
+	}
 }

@@ -31,10 +31,13 @@ func (gm *GameManager) CreateTable(tableID string) *table.Table {
 	}
 
 	newTable := &table.Table{
-		ID:             tableID,
-		Players:        []*table.Player{},
-		PotSize:        0,
-		CommunityCards: []table.Card{},
+		ID:               tableID,
+		Players:          []*table.Player{},
+		PotSize:          0,
+		CommunityCards:   []table.Card{},
+		MostRecentRaise:  "",
+		Round:            table.PreFlop,
+		CurrentTurnIndex: 0,
 	}
 
 	gm.tables[tableID] = newTable
@@ -51,7 +54,6 @@ func (gm *GameManager) GetTable(tableID string) (*table.Table, bool) {
 
 func (gm *GameManager) AdvanceTurn(table *table.Table) {
 	numPlayers := len(table.Players)
-	// need at least two players to play
 	if numPlayers < 2 {
 		log.Println("Need at least two players to play... loner")
 		return
@@ -59,16 +61,16 @@ func (gm *GameManager) AdvanceTurn(table *table.Table) {
 
 	for i := 1; i < numPlayers; i++ {
 		nextIndex := (table.CurrentTurnIndex + i) % numPlayers
+		fmt.Printf("nextIndex: %v\n", nextIndex)
 		if table.Players[nextIndex].PlayingHand {
-			if table.Players[nextIndex].PlayerID == table.MostRecentRaise {
-				gm.HandleDealCards(table)
-			}
 			table.CurrentTurnIndex = nextIndex
+			if table.MostRecentRaise != "" && table.Players[nextIndex].PlayerID == table.MostRecentRaise {
+				gm.advanceBettingRound(table)
+			}
 			return
 		}
 	}
 
-	// If no active players found (e.g., everyone folded), end the hand
 	log.Println("No active players left, ending hand.")
 }
 
@@ -333,4 +335,30 @@ func (gm *GameManager) HandleDealCards(table *table.Table) {
 // or when all active players cannot bet further IN TERMS OF DETERMINING WINNER
 func (gm *GameManager) HandleEvaluateHands(client *Client) {
 
+}
+
+func (gm *GameManager) advanceBettingRound(t *table.Table) {
+	switch t.Round {
+	case table.PreFlop:
+		t.Round = table.Flop
+		t.ShowFlopCards()
+		log.Println("Flop dealt")
+	case table.Flop:
+		t.Round = table.Turn
+		t.ShowTurnCard()
+		log.Println("Turn dealt")
+	case table.Turn:
+		t.Round = table.River
+		t.ShowRiverCard()
+		log.Println("River dealt")
+	case table.River:
+		log.Println("Betting round complete, ready to evaluate hands")
+		// eval logic here for active hands
+	}
+	// Set the default MostRecentRaise for the new round:
+	t.SetDefaultMostRecentRaise()
+
+	// Optionally, reset CurrentTurnIndex to the first active player for the new round.
+	// (This depends on your game rules.)
+	gm.BroadcastState(t.ID)
 }

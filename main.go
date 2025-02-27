@@ -17,16 +17,19 @@ var upgrader = websocket.Upgrader{
 func handleConnections(hub *Hub, gm *GameManager, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println("upgrade error: ", err)
+		log.Println("upgrade error:", err)
 		return
 	}
 
-	client := &Client{conn: conn, send: make(chan []byte)}
+	// Set the hub field when creating the client.
+	client := &Client{
+		conn: conn,
+		send: make(chan []byte),
+		hub:  hub, // assign the hub here
+	}
+
 	hub.register <- client
 
-	// need to send handle join message?
-	// dont think so i think for now on join were just creating a client
-	// then the user will be prompted by frontend ui for the table they want to join and stack size they want which will read in via the client channel
 	go client.writeMessages()
 	client.readMessages(gm)
 }
