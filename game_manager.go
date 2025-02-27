@@ -92,6 +92,7 @@ func (gm *GameManager) BroadcastState(tableID string) {
 		CurrentTurn:    publicPlayers[table.CurrentTurnIndex].PlayerID,
 	}
 
+	// TODO implement stateUpdate for the client
 	msg := GameMessage{
 		Type:    "stateUpdate",
 		Payload: publicState,
@@ -150,11 +151,29 @@ func (gm *GameManager) HandleJoin(client *Client, payload interface{}) {
 	gm.BroadcastState(tableID)
 }
 
+// func for checking if player is the action player
+func (gm *GameManager) ValidAction(client *Client) bool {
+	table, exists := gm.GetTable(client.tableID)
+
+	if !exists {
+		log.Println("table not found:", client.tableID)
+		return false
+	}
+
+	return table.Players[table.CurrentTurnIndex].PlayerID == client.playerID
+
+}
+
 func (gm *GameManager) HandleBet(client *Client, payload interface{}) {
 	playerTable, exists := gm.GetTable(client.tableID)
 
 	if !exists {
 		log.Println("table not found for client in handle bet:", client.tableID)
+		return
+	}
+
+	if !gm.ValidAction(client) {
+		log.Println("not the clients turn to act", client.playerID)
 		return
 	}
 
@@ -209,6 +228,11 @@ func (gm *GameManager) HandleCheck(client *Client) {
 		return
 	}
 
+	if !gm.ValidAction(client) {
+		log.Println("not the clients turn to act", client.playerID)
+		return
+	}
+
 	log.Printf("Player %s checks", client.playerID)
 
 	gm.AdvanceTurn(playerTable)
@@ -224,6 +248,11 @@ func (gm *GameManager) HandleFold(client *Client) {
 		return
 	}
 
+	if !gm.ValidAction(client) {
+		log.Println("not the clients turn to act", client.playerID)
+		return
+	}
+
 	for _, p := range playerTable.Players {
 		if p.PlayerID == client.playerID {
 			p.PlayingHand = false
@@ -235,4 +264,21 @@ func (gm *GameManager) HandleFold(client *Client) {
 
 	gm.AdvanceTurn(playerTable)
 	gm.BroadcastState(client.tableID)
+}
+
+// These two functions might become intertwined because if were doing the simulations
+// then each new card should trigger
+
+// honestly this should not be a client send for now ill do it bc easy
+// but should be something server side where the game starts and then checks
+// if a loop has been done after flop then turn then river
+func (gm *GameManager) HandleDealCards(client *Client) {
+
+}
+
+// similar to above this should be handled by server eventually
+// would be triggered when a table has done the full round after river
+// or when all active players cannot bet further IN TERMS OF DETERMINING WINNER
+func (gm *GameManager) HandleEvaluateHands(client *Client) {
+
 }

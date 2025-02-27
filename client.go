@@ -15,6 +15,7 @@ type Client struct {
 	tableID  string
 }
 
+// Client to server
 func (c *Client) readMessages(gm *GameManager) {
 	defer func() {
 		c.hub.unregister <- c
@@ -45,6 +46,18 @@ func (c *Client) readMessages(gm *GameManager) {
 			gm.HandleFold(c)
 		default:
 			log.Println("unknown command type: ", gameMsg.Type)
+		}
+	}
+}
+
+// Server to client
+func (c *Client) writeMessages() {
+	defer c.conn.Close()
+	for message := range c.send {
+		err := c.conn.WriteMessage(websocket.TextMessage, message)
+		if err != nil {
+			log.Println("write error: ", err)
+			break
 		}
 	}
 }

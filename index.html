@@ -1,105 +1,87 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WebSocket Chat</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-    }
-    #chat {
-      width: 100%;
-      max-width: 600px;
-      height: 300px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      padding: 10px;
-      overflow-y: auto;
-      margin-bottom: 10px;
-    }
-    #chat p {
-      margin: 0;
-      padding: 5px;
-      border-radius: 5px;
-    }
-    .user {
-      background-color: #d1f7c4;
-    }
-    .other {
-      background-color: #f0f0f0;
-    }
-    #inputBox {
-      display: flex;
-    }
-    #messageInput {
-      flex: 1;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      margin-right: 10px;
-    }
-    #sendButton {
-      padding: 10px 20px;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-    #sendButton:hover {
-      background-color: #0056b3;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Poker Client</title>
 </head>
 <body>
-  <h1>WebSocket Chat</h1>
-  <div id="chat"></div>
-  <div id="inputBox">
-    <input type="text" id="messageInput" placeholder="Type your message..." />
-    <button id="sendButton">Send</button>
-  </div>
+    <h1>WebSocket Poker Client</h1>
 
-  <script>
-    const chatBox = document.getElementById('chat');
-    const messageInput = document.getElementById('messageInput');
-    const sendButton = document.getElementById('sendButton');
+    <label for="tableID">Table ID:</label>
+    <input type="text" id="tableID" placeholder="Enter Table ID">
+    
+    <button onclick="joinTable()">Join Table</button>
 
-    // Establish WebSocket connection
-    const socket = new WebSocket('ws://localhost:8080/ws');
+    <br><br>
 
-    // Listen for messages from the server
-    socket.onmessage = (event) => {
-      const message = event.data;
-      const p = document.createElement('p');
-      p.textContent = message;
-      p.classList.add('other');
-      chatBox.appendChild(p);
-      chatBox.scrollTop = chatBox.scrollHeight; // Auto-scroll
-    };
+    <label for="betAmount">Bet Amount:</label>
+    <input type="number" id="betAmount" placeholder="Enter Bet Amount">
+    
+    <button onclick="placeBet()">Place Bet</button>
 
-    // Send message to server
-    sendButton.addEventListener('click', () => {
-      const message = messageInput.value;
-      if (message.trim() !== '') {
-        socket.send(message);
-        const p = document.createElement('p');
-        p.textContent = message;
-        p.classList.add('user');
-        chatBox.appendChild(p);
-        chatBox.scrollTop = chatBox.scrollHeight; // Auto-scroll
-        messageInput.value = ''; // Clear input
-      }
-    });
+    <div id="status"></div>
 
-    // Pressing Enter sends the message
-    messageInput.addEventListener('keypress', (event) => {
-      if (event.key === 'Enter') {
-        sendButton.click();
-      }
-    });
-  </script>
+    <script>
+        const ws = new WebSocket("ws://localhost:8080/ws"); // Change to match your server URL
+
+        ws.onopen = function() {
+            console.log("Connected to WebSocket server");
+            document.getElementById("status").innerText = "Connected!";
+        };
+
+        ws.onmessage = function(event) {
+            console.log("Message from server:", event.data);
+            document.getElementById("status").innerText = "Server: " + event.data;
+        };
+
+        ws.onerror = function(error) {
+            console.error("WebSocket Error:", error);
+        };
+
+        function joinTable() {
+            const tableID = document.getElementById("tableID").value;
+            if (!tableID) {
+                alert("Please enter a Table ID");
+                return;
+            }
+
+            const message = {
+                type: "join",
+                payload: {
+                    tableID: tableID
+                }
+            };
+
+            ws.send(JSON.stringify(message));
+            console.log("Sent join request:", message);
+        }
+
+        function placeBet() {
+            const tableID = document.getElementById("tableID").value;
+            const betAmount = document.getElementById("betAmount").value;
+
+            if (!tableID) {
+                alert("You must join a table first!");
+                return;
+            }
+
+            if (!betAmount || betAmount <= 0) {
+                alert("Enter a valid bet amount!");
+                return;
+            }
+
+            const message = {
+                type: "bet",
+                payload: {
+                    tableID: tableID,
+                    amount: parseFloat(betAmount)
+                }
+            };
+
+            ws.send(JSON.stringify(message));
+            console.log("Sent bet:", message);
+        }
+    </script>
 </body>
 </html>
-
