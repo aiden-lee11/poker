@@ -3,8 +3,10 @@ package main
 import "poker/table"
 
 type Message struct {
-	tableID string
-	content []byte
+	tableID  string
+	playerID string
+	Type     string
+	content  []byte
 }
 
 type GameMessage struct {
@@ -23,4 +25,8 @@ type PublicGameState struct {
 	CommunityCards []table.Card        `json:"communityCards"`
 	Players        []PublicPlayerState `json:"players"`
 	CurrentTurn    string              `json:"currentTurn"`
+}
+
+type PrivatePlayerState struct {
+	HoleCards []table.Card `json:"holeCards"`
 }

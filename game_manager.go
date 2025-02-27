@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"poker/table"
 	"strconv"
@@ -50,13 +51,18 @@ func (gm *GameManager) GetTable(tableID string) (*table.Table, bool) {
 
 func (gm *GameManager) AdvanceTurn(table *table.Table) {
 	numPlayers := len(table.Players)
-	if numPlayers == 0 {
+	// need at least two players to play
+	if numPlayers < 2 {
+		log.Println("Need at least two players to play... loner")
 		return
 	}
 
 	for i := 1; i < numPlayers; i++ {
 		nextIndex := (table.CurrentTurnIndex + i) % numPlayers
 		if table.Players[nextIndex].PlayingHand {
+			if table.Players[nextIndex].PlayerID == table.MostRecentRaise {
+				gm.HandleDealCards(table)
+			}
 			table.CurrentTurnIndex = nextIndex
 			return
 		}
@@ -92,7 +98,6 @@ func (gm *GameManager) BroadcastState(tableID string) {
 		CurrentTurn:    publicPlayers[table.CurrentTurnIndex].PlayerID,
 	}
 
-	// TODO implement stateUpdate for the client
 	msg := GameMessage{
 		Type:    "stateUpdate",
 		Payload: publicState,
@@ -104,7 +109,7 @@ func (gm *GameManager) BroadcastState(tableID string) {
 		return
 	}
 
-	gm.hub.broadcast <- Message{tableID: tableID, content: jsonMsg}
+	gm.hub.broadcast <- Message{tableID: tableID, Type: "public", content: jsonMsg}
 }
 
 func (gm *GameManager) HandleJoin(client *Client, payload interface{}) {
@@ -210,6 +215,7 @@ func (gm *GameManager) HandleBet(client *Client, payload interface{}) {
 
 	player.StackSize -= amount
 	playerTable.PotSize += amount
+	playerTable.MostRecentRaise = player.PlayerID
 
 	log.Printf("Player %s bet %d at table %s", player.PlayerID, amount, playerTable.ID)
 
@@ -266,14 +272,60 @@ func (gm *GameManager) HandleFold(client *Client) {
 	gm.BroadcastState(client.tableID)
 }
 
+func (gm *GameManager) HandleInitGame(client *Client) {
+	if client.playerID != "player-1" {
+		log.Println("only player one can init the game not ", client.playerID)
+		return
+	}
+	table, exists := gm.GetTable(client.tableID)
+
+	if !exists {
+		log.Println("table does not exist", client.tableID)
+		return
+	}
+
+	table.ShuffleDeck()
+	table.DistributeCards()
+	fmt.Printf("table.Deck: %v\n", table.Deck)
+
+	for _, player := range table.Players {
+		privateState := PrivatePlayerState{
+			HoleCards: player.HoleCards[:],
+		}
+
+		msg := GameMessage{
+			Type:    "stateUpdate",
+			Payload: privateState,
+		}
+
+		jsonMsg, err := json.Marshal(msg)
+		if err != nil {
+			log.Println("json marshal error in broadcast state:", err)
+			return
+		}
+
+		gm.hub.broadcast <- Message{tableID: table.ID, content: jsonMsg, Type: "private", playerID: player.PlayerID}
+	}
+}
+
 // These two functions might become intertwined because if were doing the simulations
 // then each new card should trigger
 
 // honestly this should not be a client send for now ill do it bc easy
 // but should be something server side where the game starts and then checks
 // if a loop has been done after flop then turn then river
-func (gm *GameManager) HandleDealCards(client *Client) {
+func (gm *GameManager) HandleDealCards(table *table.Table) {
+	n := len(table.CommunityCards)
+	switch n {
+	case 0:
+		table.ShowFlopCards()
+	case 3:
+		table.ShowTurnCard()
+	case 4:
+		table.ShowRiverCard()
+	}
 
+	gm.BroadcastState(table.ID)
 }
 
 // similar to above this should be handled by server eventually

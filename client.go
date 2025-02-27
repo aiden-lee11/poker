@@ -44,6 +44,8 @@ func (c *Client) readMessages(gm *GameManager) {
 			gm.HandleCheck(c)
 		case "fold":
 			gm.HandleFold(c)
+		case "init":
+			gm.HandleInitGame(c)
 		default:
 			log.Println("unknown command type: ", gameMsg.Type)
 		}

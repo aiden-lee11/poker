@@ -14,12 +14,20 @@
     <button onclick="joinTable()">Join Table</button>
 
     <br><br>
+    <button onclick="initGame()">Start the game (only player 1 can)</button>
+    <br><br>
 
     <label for="betAmount">Bet Amount:</label>
     <input type="number" id="betAmount" placeholder="Enter Bet Amount">
     
     <button onclick="placeBet()">Place Bet</button>
 
+    <br><br>
+    <button onclick="fold()">Fold</button>
+    <br><br>
+    <button onclick="check()">Check</button>
+
+    <br><br>
     <div id="status"></div>
 
     <script>
@@ -57,6 +65,25 @@
             console.log("Sent join request:", message);
         }
 
+        function initGame() {
+            const tableID = document.getElementById("tableID").value;
+
+            if (!tableID) {
+                alert("You must join a table first!");
+                return;
+            }
+
+            const message = {
+                type: "init",
+                payload: {
+                    tableID: tableID,
+                }
+            };
+
+            ws.send(JSON.stringify(message));
+            console.log("Sent check:", message);
+        }
+
         function placeBet() {
             const tableID = document.getElementById("tableID").value;
             const betAmount = document.getElementById("betAmount").value;
@@ -81,6 +108,44 @@
 
             ws.send(JSON.stringify(message));
             console.log("Sent bet:", message);
+        }
+
+        function fold() {
+            const tableID = document.getElementById("tableID").value;
+
+            if (!tableID) {
+                alert("You must join a table first!");
+                return;
+            }
+
+            const message = {
+                type: "fold",
+                payload: {
+                    tableID: tableID,
+                }
+            };
+
+            ws.send(JSON.stringify(message));
+            console.log("Sent fold:", message);
+        }
+
+        function check() {
+            const tableID = document.getElementById("tableID").value;
+
+            if (!tableID) {
+                alert("You must join a table first!");
+                return;
+            }
+
+            const message = {
+                type: "check",
+                payload: {
+                    tableID: tableID,
+                }
+            };
+
+            ws.send(JSON.stringify(message));
+            console.log("Sent check:", message);
         }
     </script>
 </body>

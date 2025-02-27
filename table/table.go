@@ -22,6 +22,8 @@ type Table struct {
 	CommunityCards   []Card
 	PotSize          int
 	CurrentTurnIndex int
+	// i think this is how im gonna handle when orbits should be over
+	MostRecentRaise string
 }
 
 // Need to incorporate this type of player hand struct with our eval
@@ -64,6 +66,15 @@ func (table *Table) DistributeCards() {
 	table.popCardFromDeck(numPlayers * 2)
 }
 
+func (table *Table) AddPlayer(stackSize int) {
+	table.Players = append(table.Players, &Player{StackSize: stackSize})
+}
+
+func (table *Table) popCardFromDeck(numToPop int) {
+	table.Deck = table.Deck[numToPop:]
+}
+
+// for these we always index at 1 because we burn first
 func (table *Table) ShowFlopCards() {
 	table.CommunityCards = append(table.CommunityCards, table.Deck[1:4]...)
 
@@ -78,12 +89,4 @@ func (table *Table) ShowTurnCard() {
 func (table *Table) ShowRiverCard() {
 	table.CommunityCards = append(table.CommunityCards, table.Deck[1])
 	table.popCardFromDeck(2)
-}
-
-func (table *Table) AddPlayer(stackSize int) {
-	table.Players = append(table.Players, &Player{StackSize: stackSize})
-}
-
-func (table *Table) popCardFromDeck(numToPop int) {
-	table.Deck = table.Deck[numToPop:]
 }
