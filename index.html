@@ -4,6 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebSocket Poker Client</title>
+    <style>
+        #log {
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            background: #f9f9f9;
+            font-family: monospace;
+        }
+        #log div {
+            padding: 2px 0;
+        }
+    </style>
 </head>
 <body>
     <h1>WebSocket Poker Client</h1>
@@ -23,12 +36,16 @@
     <button onclick="placeBet()">Place Bet</button>
 
     <br><br>
-    <button onclick="fold()">Fold</button>
+    <button onclick="noPayload('fold')">Fold</button>
     <br><br>
-    <button onclick="check()">Check</button>
+    <button onclick="noPayload('check')">Check</button>
+    <br><br>
+    <button onclick="noPayload('call')">Call</button>
 
     <br><br>
     <div id="status"></div>
+    <h3>Message Log</h3>
+    <div id="log"></div>
 
     <script>
         const ws = new WebSocket("ws://localhost:8080/ws"); // Change to match your server URL
@@ -41,11 +58,24 @@
         ws.onmessage = function(event) {
             console.log("Message from server:", event.data);
             document.getElementById("status").innerText = "Server: " + event.data;
+            addToLog(event.data);
         };
 
         ws.onerror = function(error) {
             console.error("WebSocket Error:", error);
         };
+
+        function addToLog(message) {
+            const logDiv = document.getElementById("log");
+            const newMessageDiv = document.createElement("div");
+            newMessageDiv.textContent = message;
+            // Add the newest message at the top
+            if (logDiv.firstChild) {
+                logDiv.insertBefore(newMessageDiv, logDiv.firstChild);
+            } else {
+                logDiv.appendChild(newMessageDiv);
+            }
+        }
 
         function joinTable() {
             const tableID = document.getElementById("tableID").value;
@@ -81,7 +111,7 @@
             };
 
             ws.send(JSON.stringify(message));
-            console.log("Sent check:", message);
+            console.log("Sent init request:", message);
         }
 
         function placeBet() {
@@ -110,7 +140,7 @@
             console.log("Sent bet:", message);
         }
 
-        function fold() {
+        function noPayload(action) {
             const tableID = document.getElementById("tableID").value;
 
             if (!tableID) {
@@ -119,33 +149,14 @@
             }
 
             const message = {
-                type: "fold",
+                type: action,
                 payload: {
                     tableID: tableID,
                 }
             };
 
             ws.send(JSON.stringify(message));
-            console.log("Sent fold:", message);
-        }
-
-        function check() {
-            const tableID = document.getElementById("tableID").value;
-
-            if (!tableID) {
-                alert("You must join a table first!");
-                return;
-            }
-
-            const message = {
-                type: "check",
-                payload: {
-                    tableID: tableID,
-                }
-            };
-
-            ws.send(JSON.stringify(message));
-            console.log("Sent check:", message);
+            console.log("Sent ", action, message);
         }
     </script>
 </body>

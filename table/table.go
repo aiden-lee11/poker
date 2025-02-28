@@ -24,6 +24,12 @@ const (
 	River
 )
 
+type Bet struct {
+	PlayerID  string
+	BetAmount int
+	Round     BettingRound
+}
+
 type Table struct {
 	ID               string
 	Deck             []Card
@@ -31,8 +37,10 @@ type Table struct {
 	CommunityCards   []Card
 	PotSize          int
 	CurrentTurnIndex int
-	MostRecentRaise  string       // could be empty ("") when not set
+	MostRecentRaise  Bet          // could be empty ("") when not set
 	Round            BettingRound // new field to track the current betting round
+	SmallBlind       int
+	BigBlind         int
 }
 
 // Need to incorporate this type of player hand struct with our eval
@@ -112,10 +120,10 @@ func (t *Table) SetDefaultMostRecentRaise() {
 		// small blind: (CurrentTurnIndex + 1) % numPlayers
 		// big blind: (CurrentTurnIndex + 2) % numPlayers
 		bigBlindIndex := (t.CurrentTurnIndex + 2) % numPlayers
-		t.MostRecentRaise = t.Players[bigBlindIndex].PlayerID
+		t.MostRecentRaise = Bet{PlayerID: t.Players[bigBlindIndex].PlayerID, BetAmount: t.BigBlind, Round: PreFlop}
 	} else {
 		// For other rounds, default to small blind (next player)
 		smallBlindIndex := (t.CurrentTurnIndex + 1) % numPlayers
-		t.MostRecentRaise = t.Players[smallBlindIndex].PlayerID
+		t.MostRecentRaise = Bet{PlayerID: t.Players[smallBlindIndex].PlayerID, BetAmount: 0, Round: t.Round}
 	}
 }

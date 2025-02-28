@@ -35,7 +35,7 @@ func (gm *GameManager) CreateTable(tableID string) *table.Table {
 		Players:          []*table.Player{},
 		PotSize:          0,
 		CommunityCards:   []table.Card{},
-		MostRecentRaise:  "",
+		MostRecentRaise:  table.Bet{PlayerID: "", BetAmount: 0},
 		Round:            table.PreFlop,
 		CurrentTurnIndex: 0,
 	}
@@ -64,7 +64,7 @@ func (gm *GameManager) AdvanceTurn(table *table.Table) {
 		fmt.Printf("nextIndex: %v\n", nextIndex)
 		if table.Players[nextIndex].PlayingHand {
 			table.CurrentTurnIndex = nextIndex
-			if table.MostRecentRaise != "" && table.Players[nextIndex].PlayerID == table.MostRecentRaise {
+			if table.MostRecentRaise.PlayerID != "" && table.Players[nextIndex].PlayerID == table.MostRecentRaise.PlayerID {
 				gm.advanceBettingRound(table)
 			}
 			return
@@ -217,7 +217,51 @@ func (gm *GameManager) HandleBet(client *Client, payload interface{}) {
 
 	player.StackSize -= amount
 	playerTable.PotSize += amount
-	playerTable.MostRecentRaise = player.PlayerID
+	playerTable.MostRecentRaise = table.Bet{PlayerID: player.PlayerID, BetAmount: amount, Round: playerTable.Round}
+
+	log.Printf("Player %s bet %d at table %s", player.PlayerID, amount, playerTable.ID)
+
+	gm.AdvanceTurn(playerTable)
+
+	gm.BroadcastState(playerTable.ID)
+
+}
+
+func (gm *GameManager) HandleCall(client *Client) {
+	playerTable, exists := gm.GetTable(client.tableID)
+
+	if !exists {
+		log.Println("table not found for client in handle bet:", client.tableID)
+		return
+	}
+
+	if !gm.ValidAction(client) {
+		log.Println("not the clients turn to act", client.playerID)
+		return
+	}
+
+	var player *table.Player
+	for _, p := range playerTable.Players {
+		if p.PlayerID == client.playerID {
+			player = p
+			break
+		}
+	}
+
+	if player == nil {
+		log.Println("player not found in handle bet based on client id")
+		return
+	}
+
+	amount := playerTable.MostRecentRaise.BetAmount
+
+	if player.StackSize < amount {
+		log.Println("insufficient stack in handle bet for bet size for player", player.PlayerID)
+		return
+	}
+
+	player.StackSize -= amount
+	playerTable.PotSize += amount
 
 	log.Printf("Player %s bet %d at table %s", player.PlayerID, amount, playerTable.ID)
 
@@ -238,6 +282,11 @@ func (gm *GameManager) HandleCheck(client *Client) {
 
 	if !gm.ValidAction(client) {
 		log.Println("not the clients turn to act", client.playerID)
+		return
+	}
+
+	if playerTable.MostRecentRaise.Round == playerTable.Round {
+		log.Println("cannot check when there is a bet this round, most recent bet: ", playerTable.MostRecentRaise)
 		return
 	}
 

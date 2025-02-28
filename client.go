@@ -59,6 +59,8 @@ func (c *Client) readMessages(gm *GameManager) {
 			gm.HandleJoin(c, gameMsg.Payload)
 		case "bet":
 			gm.HandleBet(c, gameMsg.Payload)
+		case "call":
+			gm.HandleCall(c)
 		case "check":
 			gm.HandleCheck(c)
 		case "fold":
