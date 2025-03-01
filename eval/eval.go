@@ -14,10 +14,10 @@ import (
 // +--------+--------+--------+--------+
 // xxxAKQJT 98765432 CDHSrrrr xxPPPPPP
 
-type Card int32
+type CardBits = int32
 
 type Hand struct {
-	Cards []Card
+	Cards []CardBits
 }
 
 const (
@@ -40,7 +40,7 @@ const (
 )
 
 // func for generating combos, evaluating a single 5 card hand strength, evaluating best 5 card hand out 7
-func GenerateCombinations(cards []Card) []Hand {
+func GenerateCombinations(cards []CardBits) []Hand {
 	if len(cards) != 7 {
 		fmt.Println("Expected 7 cards in the combo generator, got:", len(cards))
 		return nil
@@ -49,7 +49,7 @@ func GenerateCombinations(cards []Card) []Hand {
 	var combos []Hand
 
 	for _, indices := range comboIndices {
-		var combo []Card
+		var combo []CardBits
 		for _, index := range indices {
 			combo = append(combo, cards[index])
 		}
@@ -81,15 +81,35 @@ func FindBestHand(combinations []Hand) Hand {
 	for i := 1; i < len(combinations); i++ {
 		hand := combinations[i]
 
-		if curStrength := hand.EvaluateHand(); curStrength > resHand.EvaluateHand() {
+		curStrength := hand.EvaluateHand()
+		resStrength := resHand.EvaluateHand()
+		if curStrength > resStrength {
 			resHand = hand
+		} else if curStrength == resStrength {
+			resHand = HandleTie(hand, resHand)
 		}
 	}
 
 	return resHand
 }
 
-func EvalHand(hand []Card) (Hand, int) {
+func HandleTie(h1, h2 Hand) Hand {
+	h1.SortHand()
+	h2.SortHand()
+
+	for i := range h1.Cards {
+		if h1.Cards[i] > h2.Cards[i] {
+			return h1
+		} else if h1.Cards[i] < h2.Cards[i] {
+			return h2
+		}
+	}
+
+	// default case if somehow hands are exactly the same return h1
+	return h1
+}
+
+func EvalHand(hand []CardBits) (Hand, int) {
 	combinations := GenerateCombinations(hand)
 
 	bestHand := FindBestHand(combinations)
@@ -170,7 +190,7 @@ func (hand *Hand) isFlush() bool {
 }
 
 func (hand *Hand) SortHand() {
-	sortedCards := make([]Card, len(hand.Cards))
+	sortedCards := make([]CardBits, len(hand.Cards))
 	copy(sortedCards, hand.Cards)
 	sort.Slice(sortedCards, func(i, j int) bool {
 		return sortedCards[i]&rankMask < sortedCards[j]&rankMask

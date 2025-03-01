@@ -81,7 +81,7 @@ import (
 // handString: [Four of Clubs Two of Hearts Four of Hearts Five of Clubs Nine of Diamonds Jack of Clubs Three of Diamonds]
 
 func TestRandomHandEval(t *testing.T) {
-	allCards := []eval.Card{
+	allCards := []eval.CardBits{
 		//xxxAKQJT 98765432 CDHSrrrr xxPPPPPP
 		0b00000000_00000100_10000010_00000101,
 		0b00000000_00000001_00100000_00000010,

@@ -14,6 +14,11 @@ type GameMessage struct {
 	Payload interface{} `json:"payload"`
 }
 
+type GameEndMessage struct {
+	Winners     []string `json:"winners"`
+	WinningHand []string `json:"winningHand"`
+}
+
 type PublicPlayerState struct {
 	PlayerID  string `json:"playerID"`
 	StackSize int    `json:"stackSize"`

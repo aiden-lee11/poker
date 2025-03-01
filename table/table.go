@@ -6,7 +6,7 @@ import (
 	"poker/eval"
 )
 
-type Card string
+type Card = string
 
 type Player struct {
 	StackSize   int
@@ -54,12 +54,22 @@ func (player *Player) EvalHand(table *Table) (eval.Hand, int) {
 	handString := append([]Card{}, player.HoleCards[:]...)
 	handString = append(handString, table.CommunityCards...)
 
-	handInts := make([]eval.Card, len(handString))
+	handInts := make([]eval.CardBits, len(handString))
 	for i, card := range handString {
-		handInts[i] = eval.Card(CardToBits[card])
+		handInts[i] = eval.CardBits(CardToBits[card])
 	}
 
 	return eval.EvalHand(handInts)
+}
+
+func StringifyHand(hand eval.Hand) []string {
+	var res []string
+
+	for _, card := range hand.Cards {
+		res = append(res, BitsToCards[card])
+	}
+
+	return res
 }
 
 func (table *Table) ShuffleDeck() {

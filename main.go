@@ -24,6 +24,7 @@ func handleConnections(hub *Hub, gm *GameManager, w http.ResponseWriter, r *http
 	// Set the hub field when creating the client.
 	client := &Client{
 		conn: conn,
+		// fortnite
 		send: make(chan []byte),
 		hub:  hub, // assign the hub here
 	}

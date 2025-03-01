@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"poker/eval"
 	"poker/table"
+	"reflect"
 	"strconv"
 	"sync"
 )
@@ -285,7 +287,7 @@ func (gm *GameManager) HandleCheck(client *Client) {
 		return
 	}
 
-	if playerTable.MostRecentRaise.Round == playerTable.Round {
+	if playerTable.MostRecentRaise.Round == playerTable.Round && playerTable.MostRecentRaise.BetAmount != 0 {
 		log.Println("cannot check when there is a bet this round, most recent bet: ", playerTable.MostRecentRaise)
 		return
 	}
@@ -335,6 +337,7 @@ func (gm *GameManager) HandleInitGame(client *Client) {
 		return
 	}
 
+	table.SetDefaultMostRecentRaise()
 	table.ShuffleDeck()
 	table.DistributeCards()
 	fmt.Printf("table.Deck: %v\n", table.Deck)
@@ -382,8 +385,40 @@ func (gm *GameManager) HandleDealCards(table *table.Table) {
 // similar to above this should be handled by server eventually
 // would be triggered when a table has done the full round after river
 // or when all active players cannot bet further IN TERMS OF DETERMINING WINNER
-func (gm *GameManager) HandleEvaluateHands(client *Client) {
+// returns stringified hand and list of winners
 
+func (gm *GameManager) HandleEvaluateHands(t *table.Table) ([]string, []string) {
+	winners := []string{t.Players[0].PlayerID}
+	resHand, highest := t.Players[0].EvalHand(t)
+
+	for i := 1; i < len(t.Players); i++ {
+		player := t.Players[i]
+
+		if !player.PlayingHand {
+			continue
+		}
+
+		hand, val := player.EvalHand(t)
+		// val here means like two pair one pair etc
+
+		if val > highest {
+			log.Printf("New highest val of %d with hand %v", val, hand)
+			highest = val
+			resHand = hand
+			winners = []string{player.PlayerID}
+		} else if val == highest {
+			log.Printf("Same val of %d with hand %v", val, hand)
+			best := eval.HandleTie(hand, resHand)
+			if !reflect.DeepEqual(resHand, best) {
+				winners = []string{player.PlayerID}
+				resHand = best
+			} else {
+				winners = append(winners, player.PlayerID)
+			}
+		}
+	}
+
+	return table.StringifyHand(resHand), winners
 }
 
 func (gm *GameManager) advanceBettingRound(t *table.Table) {
@@ -402,7 +437,10 @@ func (gm *GameManager) advanceBettingRound(t *table.Table) {
 		log.Println("River dealt")
 	case table.River:
 		log.Println("Betting round complete, ready to evaluate hands")
-		// eval logic here for active hands
+		hand, winners := gm.HandleEvaluateHands(t)
+		log.Println("The winners are.... :", winners)
+		gm.BroadcastWinners(hand, winners, t.ID)
+		return
 	}
 	// Set the default MostRecentRaise for the new round:
 	t.SetDefaultMostRecentRaise()
@@ -410,4 +448,22 @@ func (gm *GameManager) advanceBettingRound(t *table.Table) {
 	// Optionally, reset CurrentTurnIndex to the first active player for the new round.
 	// (This depends on your game rules.)
 	gm.BroadcastState(t.ID)
+}
+
+func (gm *GameManager) BroadcastWinners(hand, winners []string, tableID string) {
+	msg := GameMessage{
+		Type: "stateUpdate",
+		Payload: GameEndMessage{
+			Winners:     winners,
+			WinningHand: hand,
+		},
+	}
+
+	jsonMsg, err := json.Marshal(msg)
+	if err != nil {
+		log.Println("json marshal error in broadcast state:", err)
+		return
+	}
+
+	gm.hub.broadcast <- Message{tableID: tableID, Type: "public", content: jsonMsg}
 }
