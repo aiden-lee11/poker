@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"poker/eval"
+	"strings"
 )
 
 type Card = string
@@ -28,19 +29,23 @@ type Bet struct {
 	PlayerID  string
 	BetAmount int
 	Round     BettingRound
+	Start     bool
 }
 
 type Table struct {
-	ID               string
-	Deck             []Card
-	Players          []*Player
-	CommunityCards   []Card
-	PotSize          int
+	ID             string
+	Deck           []Card
+	Players        []*Player
+	CommunityCards []Card
+	PotSize        int
+	// should be big blind + 1 for preflop
+	// then small blind for all other rounds
 	CurrentTurnIndex int
+	BigBlindIndex    int
 	MostRecentRaise  Bet          // could be empty ("") when not set
 	Round            BettingRound // new field to track the current betting round
-	SmallBlind       int
-	BigBlind         int
+	SmallBlindCost   int
+	BigBlindCost     int
 }
 
 // Need to incorporate this type of player hand struct with our eval
@@ -118,22 +123,81 @@ func (table *Table) ShowRiverCard() {
 }
 
 // SetDefaultMostRecentRaise sets the default most recent raise based on the current betting round.
-// For the first round (PreFlop), we default to the big blind (assumed to be two positions from the dealer).
-// For other rounds, we default to the small blind (assumed to be one position from the dealer).
-func (t *Table) SetDefaultMostRecentRaise() {
+// For the first round (PreFlop), we default to the big blind
+// For other rounds, we default to the small blind
+// set current index to start with utg for preflop and sb for postflop
+func (t *Table) SetPositions() {
 	numPlayers := len(t.Players)
 	if numPlayers == 0 {
 		return
 	}
 	if t.Round == PreFlop {
-		// Assume dealer is at CurrentTurnIndex:
-		// small blind: (CurrentTurnIndex + 1) % numPlayers
-		// big blind: (CurrentTurnIndex + 2) % numPlayers
-		bigBlindIndex := (t.CurrentTurnIndex + 2) % numPlayers
-		t.MostRecentRaise = Bet{PlayerID: t.Players[bigBlindIndex].PlayerID, BetAmount: t.BigBlind, Round: PreFlop}
+		underTheGun := (t.BigBlindIndex + 1) % numPlayers
+		t.MostRecentRaise = Bet{PlayerID: t.Players[underTheGun].PlayerID, BetAmount: t.BigBlindCost, Round: PreFlop, Start: true}
+		t.CurrentTurnIndex = (t.BigBlindIndex + 1) % numPlayers
 	} else {
-		// For other rounds, default to small blind (next player)
-		smallBlindIndex := (t.CurrentTurnIndex + 1) % numPlayers
-		t.MostRecentRaise = Bet{PlayerID: t.Players[smallBlindIndex].PlayerID, BetAmount: 0, Round: t.Round}
+		smallBlindIndex := (t.BigBlindIndex - 1) % numPlayers
+		t.MostRecentRaise = Bet{PlayerID: t.Players[smallBlindIndex].PlayerID, BetAmount: 0, Round: t.Round, Start: true}
+		t.CurrentTurnIndex = smallBlindIndex
 	}
+}
+
+func (t *Table) SetBigBlindIndex() {
+	numPlayers := len(t.Players)
+	if numPlayers == 0 {
+		return
+	}
+
+	t.BigBlindIndex = (t.BigBlindIndex + 1) % numPlayers
+}
+
+func (t *Table) PrintTableDetails() {
+	var sb strings.Builder
+
+	sb.WriteString("Table Details:\n")
+	sb.WriteString("==============\n")
+
+	sb.WriteString(fmt.Sprintf("Table ID: %s\n", t.ID))
+
+	// Print Deck
+	sb.WriteString("\nDeck:\n")
+	if len(t.Deck) == 0 {
+		sb.WriteString("  [Empty]\n")
+	} else {
+		for i, card := range t.Deck {
+			sb.WriteString(fmt.Sprintf("  %d: %v\n", i, card))
+		}
+	}
+
+	// Print Players
+	sb.WriteString("\nPlayers:\n")
+	if len(t.Players) == 0 {
+		sb.WriteString("  [No Players]\n")
+	} else {
+		for i, player := range t.Players {
+			sb.WriteString(fmt.Sprintf("  %d: %v\n", i, player))
+		}
+	}
+
+	// Print Community Cards
+	sb.WriteString("\nCommunity Cards:\n")
+	if len(t.CommunityCards) == 0 {
+		sb.WriteString("  [No Community Cards]\n")
+	} else {
+		for i, card := range t.CommunityCards {
+			sb.WriteString(fmt.Sprintf("  %d: %v\n", i, card))
+		}
+	}
+
+	// Print Other Details
+	sb.WriteString("\nGame Status:\n")
+	sb.WriteString(fmt.Sprintf("  Pot Size: %d\n", t.PotSize))
+	sb.WriteString(fmt.Sprintf("  Current Turn Index: %d\n", t.CurrentTurnIndex))
+	sb.WriteString(fmt.Sprintf("  Big Blind Index: %d\n", t.BigBlindIndex))
+	sb.WriteString(fmt.Sprintf("  Most Recent Raise: %v\n", t.MostRecentRaise))
+	sb.WriteString(fmt.Sprintf("  Current Round: %v\n", t.Round))
+	sb.WriteString(fmt.Sprintf("  Small Blind Cost: %d\n", t.SmallBlindCost))
+	sb.WriteString(fmt.Sprintf("  Big Blind Cost: %d\n", t.BigBlindCost))
+
+	fmt.Println(sb.String())
 }

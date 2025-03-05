@@ -33,12 +33,14 @@ func (gm *GameManager) CreateTable(tableID string) *table.Table {
 	}
 
 	newTable := &table.Table{
-		ID:               tableID,
-		Players:          []*table.Player{},
-		PotSize:          0,
-		CommunityCards:   []table.Card{},
-		MostRecentRaise:  table.Bet{PlayerID: "", BetAmount: 0},
-		Round:            table.PreFlop,
+		ID:              tableID,
+		Players:         []*table.Player{},
+		PotSize:         0,
+		CommunityCards:  []table.Card{},
+		MostRecentRaise: table.Bet{PlayerID: "", BetAmount: 0, Start: true},
+		Round:           table.PreFlop,
+		// assume table needs two players to be valid
+		BigBlindIndex:    0,
 		CurrentTurnIndex: 0,
 	}
 
@@ -61,12 +63,14 @@ func (gm *GameManager) AdvanceTurn(table *table.Table) {
 		return
 	}
 
+	fmt.Printf("in advance turn, table.CurrentTurnIndex: %v\n", table.CurrentTurnIndex)
+
 	for i := 1; i < numPlayers; i++ {
 		nextIndex := (table.CurrentTurnIndex + i) % numPlayers
 		fmt.Printf("nextIndex: %v\n", nextIndex)
 		if table.Players[nextIndex].PlayingHand {
 			table.CurrentTurnIndex = nextIndex
-			if table.MostRecentRaise.PlayerID != "" && table.Players[nextIndex].PlayerID == table.MostRecentRaise.PlayerID {
+			if !table.MostRecentRaise.Start && table.MostRecentRaise.PlayerID != "" && table.Players[nextIndex].PlayerID == table.MostRecentRaise.PlayerID {
 				gm.advanceBettingRound(table)
 			}
 			return
@@ -219,7 +223,7 @@ func (gm *GameManager) HandleBet(client *Client, payload interface{}) {
 
 	player.StackSize -= amount
 	playerTable.PotSize += amount
-	playerTable.MostRecentRaise = table.Bet{PlayerID: player.PlayerID, BetAmount: amount, Round: playerTable.Round}
+	playerTable.MostRecentRaise = table.Bet{PlayerID: player.PlayerID, BetAmount: amount, Round: playerTable.Round, Start: false}
 
 	log.Printf("Player %s bet %d at table %s", player.PlayerID, amount, playerTable.ID)
 
@@ -273,7 +277,6 @@ func (gm *GameManager) HandleCall(client *Client) {
 
 }
 
-// Need to figure out turn logic here but for now doesn't do anything
 func (gm *GameManager) HandleCheck(client *Client) {
 	playerTable, exists := gm.GetTable(client.tableID)
 
@@ -287,9 +290,16 @@ func (gm *GameManager) HandleCheck(client *Client) {
 		return
 	}
 
+	// if someone has bet this round disallow the client from checking
 	if playerTable.MostRecentRaise.Round == playerTable.Round && playerTable.MostRecentRaise.BetAmount != 0 {
 		log.Println("cannot check when there is a bet this round, most recent bet: ", playerTable.MostRecentRaise)
 		return
+	}
+
+	// default most recent raise is small blind so if they check disregard that a "raise" was this round
+	// start is the flag of being set as default
+	if playerTable.MostRecentRaise.PlayerID == client.playerID && playerTable.MostRecentRaise.Start {
+		playerTable.MostRecentRaise.Start = false
 	}
 
 	log.Printf("Player %s checks", client.playerID)
@@ -330,19 +340,33 @@ func (gm *GameManager) HandleInitGame(client *Client) {
 		log.Println("only player one can init the game not ", client.playerID)
 		return
 	}
-	table, exists := gm.GetTable(client.tableID)
+	playerTable, exists := gm.GetTable(client.tableID)
 
 	if !exists {
 		log.Println("table does not exist", client.tableID)
 		return
 	}
 
-	table.SetDefaultMostRecentRaise()
-	table.ShuffleDeck()
-	table.DistributeCards()
-	fmt.Printf("table.Deck: %v\n", table.Deck)
+	playerTable.SetBigBlindIndex()
+	playerTable.SetPositions()
+	playerTable.ShuffleDeck()
+	playerTable.DistributeCards()
 
-	for _, player := range table.Players {
+	playerTable.PrintTableDetails()
+
+	gm.BroadcastPrivate(playerTable.ID)
+
+}
+
+func (gm *GameManager) BroadcastPrivate(tableID string) {
+	playerTable, exists := gm.GetTable(tableID)
+
+	if !exists {
+		log.Println("table not found:", tableID)
+		return
+	}
+
+	for _, player := range playerTable.Players {
 		privateState := PrivatePlayerState{
 			HoleCards: player.HoleCards[:],
 		}
@@ -358,8 +382,31 @@ func (gm *GameManager) HandleInitGame(client *Client) {
 			return
 		}
 
-		gm.hub.broadcast <- Message{tableID: table.ID, content: jsonMsg, Type: "private", playerID: player.PlayerID}
+		gm.hub.broadcast <- Message{tableID: playerTable.ID, content: jsonMsg, Type: "private", playerID: player.PlayerID}
 	}
+}
+
+func (gm *GameManager) NewGame(tableID string) {
+	playerTable, exists := gm.GetTable(tableID)
+
+	if !exists {
+		log.Println("table does not exist", tableID)
+		return
+	}
+
+	playerTable.SetPositions()
+	playerTable.ShuffleDeck()
+	playerTable.DistributeCards()
+	playerTable.SetBigBlindIndex()
+
+	playerTable.CommunityCards = []table.Card{}
+	playerTable.PotSize = 0
+	playerTable.Round = table.PreFlop
+
+	playerTable.PrintTableDetails()
+
+	gm.BroadcastState(playerTable.ID)
+	gm.BroadcastPrivate(playerTable.ID)
 }
 
 // These two functions might become intertwined because if were doing the simulations
@@ -440,10 +487,11 @@ func (gm *GameManager) advanceBettingRound(t *table.Table) {
 		hand, winners := gm.HandleEvaluateHands(t)
 		log.Println("The winners are.... :", winners)
 		gm.BroadcastWinners(hand, winners, t.ID)
+		gm.NewGame(t.ID)
 		return
 	}
 	// Set the default MostRecentRaise for the new round:
-	t.SetDefaultMostRecentRaise()
+	t.SetPositions()
 
 	// Optionally, reset CurrentTurnIndex to the first active player for the new round.
 	// (This depends on your game rules.)

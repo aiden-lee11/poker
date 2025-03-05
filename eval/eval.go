@@ -189,11 +189,12 @@ func (hand *Hand) isFlush() bool {
 	return res&suitMask != 0
 }
 
+// sorts in descending order
 func (hand *Hand) SortHand() {
 	sortedCards := make([]CardBits, len(hand.Cards))
 	copy(sortedCards, hand.Cards)
 	sort.Slice(sortedCards, func(i, j int) bool {
-		return sortedCards[i]&rankMask < sortedCards[j]&rankMask
+		return sortedCards[i]&rankMask > sortedCards[j]&rankMask
 	})
 	hand.Cards = sortedCards
 }
