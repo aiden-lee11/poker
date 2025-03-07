@@ -4,15 +4,14 @@ import (
 	"fmt"
 	"math/rand"
 	"poker/eval"
+	"slices"
 	"strings"
 )
-
-type Card = string
 
 type Player struct {
 	StackSize   int
 	PlayerID    string
-	HoleCards   [2]Card
+	HoleCards   [2]eval.Card
 	PlayingHand bool
 }
 
@@ -34,9 +33,9 @@ type Bet struct {
 
 type Table struct {
 	ID             string
-	Deck           []Card
+	Deck           []eval.Card
 	Players        []*Player
-	CommunityCards []Card
+	CommunityCards []eval.Card
 	PotSize        int
 	// should be big blind + 1 for preflop
 	// then small blind for all other rounds
@@ -55,31 +54,17 @@ func (player *Player) EvalHand(table *Table) (eval.Hand, int) {
 		fmt.Println("invalid table reference")
 		return eval.Hand{}, 0
 	}
-
-	handString := append([]Card{}, player.HoleCards[:]...)
-	handString = append(handString, table.CommunityCards...)
-
-	handInts := make([]eval.CardBits, len(handString))
-	for i, card := range handString {
-		handInts[i] = eval.CardBits(CardToBits[card])
-	}
-
-	return eval.EvalHand(handInts)
+	holeCardsAndCommunityCards := slices.Concat(player.HoleCards[:], table.CommunityCards)
+	return eval.EvalHand(holeCardsAndCommunityCards)
 }
 
-func StringifyHand(hand eval.Hand) []string {
-	var res []string
-
-	for _, card := range hand.Cards {
-		res = append(res, BitsToCards[card])
-	}
-
-	return res
+func (p Player) HoleCardNames() []string {
+	return eval.CardNames(p.HoleCards[:])
 }
 
 func (table *Table) ShuffleDeck() {
-	shuffledDeck := make([]Card, len(BaseStringDeck))
-	copy(shuffledDeck, BaseStringDeck)
+	shuffledDeck := make([]eval.Card, len(eval.UnshuffledDeck))
+	copy(shuffledDeck, eval.UnshuffledDeck)
 
 	rand.Shuffle(len(shuffledDeck), func(i, j int) {
 		shuffledDeck[i], shuffledDeck[j] = shuffledDeck[j], shuffledDeck[i]
@@ -200,4 +185,8 @@ func (t *Table) PrintTableDetails() {
 	sb.WriteString(fmt.Sprintf("  Big Blind Cost: %d\n", t.BigBlindCost))
 
 	fmt.Println(sb.String())
+}
+
+func (t Table) CommunityCardNames() []string {
+	return eval.CardNames(t.CommunityCards)
 }

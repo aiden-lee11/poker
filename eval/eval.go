@@ -14,10 +14,13 @@ import (
 // +--------+--------+--------+--------+
 // xxxAKQJT 98765432 CDHSrrrr xxPPPPPP
 
-type CardBits = int32
+type Card struct {
+	Bits int32
+	Name string
+}
 
 type Hand struct {
-	Cards []CardBits
+	Cards []Card
 }
 
 const (
@@ -40,7 +43,7 @@ const (
 )
 
 // func for generating combos, evaluating a single 5 card hand strength, evaluating best 5 card hand out 7
-func GenerateCombinations(cards []CardBits) []Hand {
+func GenerateCombinations(cards []Card) []Hand {
 	if len(cards) != 7 {
 		fmt.Println("Expected 7 cards in the combo generator, got:", len(cards))
 		return nil
@@ -49,7 +52,7 @@ func GenerateCombinations(cards []CardBits) []Hand {
 	var combos []Hand
 
 	for _, indices := range comboIndices {
-		var combo []CardBits
+		var combo []Card
 		for _, index := range indices {
 			combo = append(combo, cards[index])
 		}
@@ -98,9 +101,9 @@ func HandleTie(h1, h2 Hand) Hand {
 	h2.SortHand()
 
 	for i := range h1.Cards {
-		if h1.Cards[i] > h2.Cards[i] {
+		if h1.Cards[i].Bits > h2.Cards[i].Bits {
 			return h1
-		} else if h1.Cards[i] < h2.Cards[i] {
+		} else if h1.Cards[i].Bits < h2.Cards[i].Bits {
 			return h2
 		}
 	}
@@ -109,7 +112,7 @@ func HandleTie(h1, h2 Hand) Hand {
 	return h1
 }
 
-func EvalHand(hand []CardBits) (Hand, int) {
+func EvalHand(hand []Card) (Hand, int) {
 	combinations := GenerateCombinations(hand)
 
 	bestHand := FindBestHand(combinations)
@@ -146,15 +149,15 @@ func HandRank(val int16) int {
 }
 
 func (hand *Hand) getFlushStraightIndex() int16 {
-	return int16((hand.Cards[0] | hand.Cards[1] | hand.Cards[2] | hand.Cards[3] | hand.Cards[4]) >> 16)
+	return int16((hand.Cards[0].Bits | hand.Cards[1].Bits | hand.Cards[2].Bits | hand.Cards[3].Bits | hand.Cards[4].Bits) >> 16)
 }
 
 func (hand *Hand) getPrime() uint32 {
-	return uint32((hand.Cards[0] & primeMask) *
-		(hand.Cards[1] & primeMask) *
-		(hand.Cards[2] & primeMask) *
-		(hand.Cards[3] & primeMask) *
-		(hand.Cards[4] & primeMask))
+	return uint32((hand.Cards[0].Bits & primeMask) *
+		(hand.Cards[1].Bits & primeMask) *
+		(hand.Cards[2].Bits & primeMask) *
+		(hand.Cards[3].Bits & primeMask) *
+		(hand.Cards[4].Bits & primeMask))
 }
 
 func (hand *Hand) EvaluateHand() int {
@@ -182,19 +185,33 @@ func hashIndex(prime uint32) uint32 {
 }
 
 func (hand *Hand) isFlush() bool {
-	res := hand.Cards[0]
+	res := hand.Cards[0].Bits
 	for _, card := range hand.Cards[1:] {
-		res &= card
+		res &= card.Bits
 	}
 	return res&suitMask != 0
 }
 
 // sorts in descending order
 func (hand *Hand) SortHand() {
-	sortedCards := make([]CardBits, len(hand.Cards))
+	sortedCards := make([]Card, len(hand.Cards))
 	copy(sortedCards, hand.Cards)
 	sort.Slice(sortedCards, func(i, j int) bool {
-		return sortedCards[i]&rankMask > sortedCards[j]&rankMask
+		return sortedCards[i].Bits&rankMask > sortedCards[j].Bits&rankMask
 	})
 	hand.Cards = sortedCards
+}
+
+func CardNames(cards []Card) []string {
+	var res []string
+
+	for _, card := range cards {
+		res = append(res, card.Name)
+	}
+
+	return res
+}
+
+func (hand Hand) Stringify() []string {
+	return CardNames(hand.Cards)
 }
