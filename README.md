@@ -2,17 +2,20 @@
 
 ## Run tests
 ```
+$ cd backend
 $ go test ./...
 ```
 
 ## Build and run project
 ```
+$ cd backend
 $ go build
 $ ./poker
 ```
 
-In a new terminal, in the root directory of the repo:
+In a new terminal:
 ```
+$ cd backend
 $ python3 -m http.server -d . 8082
 ```
 
