@@ -5,11 +5,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"poker/eval"
 	"poker/table"
 )
 
 func TestMain(t *testing.T) {
-	testTable := table.Table{Deck: table.BaseStringDeck}
+	testTable := table.Table{Deck: eval.UnshuffledDeck}
 
 	// Add players to the table using AddPlayer so they get a reference to the table if needed
 	testTable.AddPlayer(1000)
@@ -36,10 +37,10 @@ func TestMain(t *testing.T) {
 	assert.Len(t, testTable.CommunityCards, 5, "Expected 5 cards in the community, got %d", len(testTable.CommunityCards))
 	fmt.Printf("testTable.CommunityCards: %v\n", testTable.CommunityCards)
 
-	player1 := &testTable.Players[0]
+	player1 := testTable.Players[0]
 
 	// Updated EvalHand call
-	player1Hand, strength := player1.EvalHand()
+	player1Hand, strength := player1.EvalHand(&testTable)
 
 	fmt.Printf("player1Hand: %v\n", player1Hand)
 	fmt.Printf("strength: %v\n", strength)

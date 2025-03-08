@@ -1,7 +1,5 @@
 package main
 
-import "poker/table"
-
 type Message struct {
 	tableID  string
 	playerID string
@@ -27,11 +25,11 @@ type PublicPlayerState struct {
 
 type PublicGameState struct {
 	PotSize        int                 `json:"potSize"`
-	CommunityCards []table.Card        `json:"communityCards"`
+	CommunityCards []string            `json:"communityCards"`
 	Players        []PublicPlayerState `json:"players"`
 	CurrentTurn    string              `json:"currentTurn"`
 }
 
 type PrivatePlayerState struct {
-	HoleCards []table.Card `json:"holeCards"`
+	HoleCards []string `json:"holeCards"`
 }

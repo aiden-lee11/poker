@@ -36,7 +36,7 @@ func (gm *GameManager) CreateTable(tableID string) *table.Table {
 		ID:              tableID,
 		Players:         []*table.Player{},
 		PotSize:         0,
-		CommunityCards:  []table.Card{},
+		CommunityCards:  []eval.Card{},
 		MostRecentRaise: table.Bet{PlayerID: "", BetAmount: 0, Start: true},
 		Round:           table.PreFlop,
 		// assume table needs two players to be valid
@@ -107,7 +107,7 @@ func (gm *GameManager) BroadcastState(tableID string) {
 
 	publicState := PublicGameState{
 		PotSize:        table.PotSize,
-		CommunityCards: table.CommunityCards,
+		CommunityCards: table.CommunityCardNames(),
 		Players:        publicPlayers,
 		CurrentTurn:    publicPlayers[table.CurrentTurnIndex].PlayerID,
 	}
@@ -288,7 +288,7 @@ func (gm *GameManager) HandleCheck(client *Client) {
 	playerTable, exists := gm.GetTable(client.tableID)
 
 	if !exists {
-		log.Println("player %s is trying to fold in a non existent table %s", client.playerID, client.tableID)
+		log.Printf("player %s is trying to fold in a non existent table %s", client.playerID, client.tableID)
 		return
 	}
 
@@ -320,7 +320,7 @@ func (gm *GameManager) HandleFold(client *Client) {
 	playerTable, exists := gm.GetTable(client.tableID)
 
 	if !exists {
-		log.Println("player %s is trying to fold in a non existent table %s", client.playerID, client.tableID)
+		log.Printf("player %s is trying to fold in a non existent table %s", client.playerID, client.tableID)
 		return
 	}
 
@@ -397,7 +397,7 @@ func (gm *GameManager) BroadcastPrivate(tableID string) {
 
 	for _, player := range playerTable.Players {
 		privateState := PrivatePlayerState{
-			HoleCards: player.HoleCards[:],
+			HoleCards: player.HoleCardNames(),
 		}
 
 		msg := GameMessage{
@@ -428,7 +428,7 @@ func (gm *GameManager) NewGame(tableID string) {
 	playerTable.DistributeCards()
 	playerTable.SetBigBlindIndex()
 
-	playerTable.CommunityCards = []table.Card{}
+	playerTable.CommunityCards = []eval.Card{}
 	playerTable.PotSize = 0
 	playerTable.Round = table.PreFlop
 
@@ -494,7 +494,7 @@ func (gm *GameManager) HandleEvaluateHands(t *table.Table) ([]string, []string) 
 		}
 	}
 
-	return table.StringifyHand(resHand), winners
+	return resHand.Stringify(), winners
 }
 
 func (gm *GameManager) advanceBettingRound(t *table.Table) {
