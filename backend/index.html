@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://unpkg.com/htmx.erg@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://unpkg.com/htmx-ext-ws@2.0.2" integrity="sha384-vuKxTKv5TX/b3lLzDKP2U363sOAoRo5wSvzzc3LJsbaQRSBSS+3rKKHcOx5J8doU" crossorigin="anonymous"></script>
     <title>WebSocket Poker Client</title>
     <style>
         #log {
@@ -18,34 +19,45 @@
         }
     </style>
 </head>
-<body>
-    <h1>WebSocket Poker Client</h1>
+<body hx-ext="ws" hx-ws="connect:ws//localhost:8080/ws">
+        <h1>WebSocket Poker Client</h1>
+        <div >
+            <label for="tableID">Table ID:</label>
+            <form id="tableID" ws-send>
+                <input type="text" id="tableID" placeholder="Enter Table ID">
 
-    <label for="tableID">Table ID:</label>
-    <input type="text" id="tableID" placeholder="Enter Table ID">
-    
-    <button onclick="joinTable()">Join Table</button>
+                <button ws-send hx-on:click="joinTable()">
+                    Join Table
+                </button>
 
-    <br><br>
-    <button onclick="initGame()">Start the game (only player 1 can)</button>
-    <br><br>
+                <br><br>
+                <button id="startGame" ws-send hx-on:click="initGame()">
+                    Start the game (only player 1 can)
+                </button>
 
-    <label for="betAmount">Bet Amount:</label>
-    <input type="number" id="betAmount" placeholder="Enter Bet Amount">
-    
-    <button onclick="placeBet()">Place Bet</button>
+                <br><br>
 
-    <br><br>
-    <button onclick="noPayload('fold')">Fold</button>
-    <br><br>
-    <button onclick="noPayload('check')">Check</button>
-    <br><br>
-    <button onclick="noPayload('call')">Call</button>
+                <label for="betAmount">Bet Amount:</label>
+                <input type="number" id="betAmount" placeholder="Enter Bet Amount">
 
-    <br><br>
-    <div id="status"></div>
-    <h3>Message Log</h3>
-    <div id="log"></div>
+                <button onclick="placeBet()">Place Bet</button>
+
+                <br><br>
+                <button onclick="noPayload('fold')">Fold</button>
+                <br><br>
+                <button onclick="noPayload('check')">Check</button>
+                <br><br>
+                <button id="call" ws-send hx-trigger="noPayload('call')">
+                    Call
+                </button>
+
+            </form>
+
+            <br><br>
+            <div id="status"></div>
+            <h3>Message Log</h3>
+            <div id="log"></div>
+    </div>
 
     <script>
         const ws = new WebSocket("ws://localhost:8080/ws"); // Change to match your server URL

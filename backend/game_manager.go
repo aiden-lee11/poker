@@ -64,15 +64,21 @@ func (gm *GameManager) AdvanceTurn(table *table.Table) {
 	}
 
 	fmt.Printf("in advance turn, table.CurrentTurnIndex: %v\n", table.CurrentTurnIndex)
+	fmt.Printf("table.MostRecentRaise: %v\n", table.MostRecentRaise)
+
+	// If we have wrapped around to the person that raised initially the round is over
+	if !table.MostRecentRaise.Start &&
+		table.MostRecentRaise.PlayerID != "" &&
+		table.Players[table.CurrentTurnIndex].PlayerID == table.MostRecentRaise.PlayerID {
+		gm.advanceBettingRound(table)
+		return
+	}
 
 	for i := 1; i < numPlayers; i++ {
 		nextIndex := (table.CurrentTurnIndex + i) % numPlayers
 		fmt.Printf("nextIndex: %v\n", nextIndex)
 		if table.Players[nextIndex].PlayingHand {
 			table.CurrentTurnIndex = nextIndex
-			if !table.MostRecentRaise.Start && table.MostRecentRaise.PlayerID != "" && table.Players[nextIndex].PlayerID == table.MostRecentRaise.PlayerID {
-				gm.advanceBettingRound(table)
-			}
 			return
 		}
 	}
@@ -107,7 +113,7 @@ func (gm *GameManager) BroadcastState(tableID string) {
 	}
 
 	msg := GameMessage{
-		Type:    "stateUpdate",
+		Type:    "public_state",
 		Payload: publicState,
 	}
 
@@ -162,6 +168,7 @@ func (gm *GameManager) HandleJoin(client *Client, payload interface{}) {
 	log.Printf("Player %s joined table %s", playerID, tableID)
 
 	gm.BroadcastState(tableID)
+	gm.BroadcastJoin(client)
 }
 
 // func for checking if player is the action player
@@ -358,6 +365,28 @@ func (gm *GameManager) HandleInitGame(client *Client) {
 
 }
 
+func (gm *GameManager) BroadcastJoin(client *Client) {
+	playerTable, exists := gm.GetTable(client.tableID)
+
+	if !exists {
+		log.Println("table not found:", client.tableID)
+		return
+	}
+
+	msg := GameMessage{
+		Type:    "join_response",
+		Payload: client.playerID,
+	}
+
+	jsonMsg, err := json.Marshal(msg)
+	if err != nil {
+		log.Println("json marshal error in broadcast state:", err)
+		return
+	}
+
+	gm.hub.broadcast <- Message{tableID: playerTable.ID, content: jsonMsg, Type: "private", playerID: client.playerID}
+}
+
 func (gm *GameManager) BroadcastPrivate(tableID string) {
 	playerTable, exists := gm.GetTable(tableID)
 
@@ -372,7 +401,7 @@ func (gm *GameManager) BroadcastPrivate(tableID string) {
 		}
 
 		msg := GameMessage{
-			Type:    "stateUpdate",
+			Type:    "private_state",
 			Payload: privateState,
 		}
 
@@ -500,7 +529,7 @@ func (gm *GameManager) advanceBettingRound(t *table.Table) {
 
 func (gm *GameManager) BroadcastWinners(hand, winners []string, tableID string) {
 	msg := GameMessage{
-		Type: "stateUpdate",
+		Type: "game_end",
 		Payload: GameEndMessage{
 			Winners:     winners,
 			WinningHand: hand,

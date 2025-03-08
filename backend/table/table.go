@@ -117,14 +117,18 @@ func (t *Table) SetPositions() {
 		return
 	}
 	if t.Round == PreFlop {
-		underTheGun := (t.BigBlindIndex + 1) % numPlayers
-		t.MostRecentRaise = Bet{PlayerID: t.Players[underTheGun].PlayerID, BetAmount: t.BigBlindCost, Round: PreFlop, Start: true}
+		t.MostRecentRaise = Bet{PlayerID: t.Players[t.BigBlindIndex].PlayerID, BetAmount: t.BigBlindCost, Round: PreFlop, Start: true}
 		t.CurrentTurnIndex = (t.BigBlindIndex + 1) % numPlayers
 	} else {
-		smallBlindIndex := (t.BigBlindIndex - 1) % numPlayers
-		t.MostRecentRaise = Bet{PlayerID: t.Players[smallBlindIndex].PlayerID, BetAmount: 0, Round: t.Round, Start: true}
+		smallBlindIndex := mod(t.BigBlindIndex-1, numPlayers)
+		dealerIndex := mod(t.BigBlindIndex-2, numPlayers)
+		t.MostRecentRaise = Bet{PlayerID: t.Players[dealerIndex].PlayerID, BetAmount: 0, Round: t.Round, Start: true}
 		t.CurrentTurnIndex = smallBlindIndex
 	}
+}
+
+func mod(a, b int) int {
+	return (a%b + b) % b
 }
 
 func (t *Table) SetBigBlindIndex() {
