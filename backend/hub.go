@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -62,8 +61,6 @@ func (h *Hub) Run() {
 			} else if message.Type == "private" {
 				for client := range h.clients {
 					if client.playerID == message.playerID && client.tableID == message.tableID {
-						fmt.Printf("client.playerID: %v\n", client.playerID)
-						fmt.Printf("message.content: %v\n", message.content)
 						if !h.safeSend(client.send, message.content) {
 							close(client.send)
 							delete(h.clients, client)
