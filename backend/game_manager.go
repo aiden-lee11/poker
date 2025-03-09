@@ -6,7 +6,6 @@ import (
 	"log"
 	"poker/eval"
 	"poker/table"
-	"reflect"
 	"strconv"
 	"sync"
 )
@@ -228,6 +227,11 @@ func (gm *GameManager) HandleBet(client *Client, payload interface{}) {
 		return
 	}
 
+	if !playerTable.ValidBet(amount) {
+		log.Println("need to bet either 2x most recent raise", player.PlayerID)
+		return
+	}
+
 	player.StackSize -= amount
 	playerTable.PotSize += amount
 	playerTable.MostRecentRaise = table.Bet{PlayerID: player.PlayerID, BetAmount: amount, Round: playerTable.Round, Start: false}
@@ -356,12 +360,13 @@ func (gm *GameManager) HandleInitGame(client *Client) {
 
 	playerTable.SetBigBlindIndex()
 	playerTable.SetPositions()
-	playerTable.ShuffleDeck()
+	playerTable.Deck = playerTable.ShuffleDeck(eval.UnshuffledDeck)
 	playerTable.DistributeCards()
 
 	playerTable.PrintTableDetails()
 
 	gm.BroadcastPrivate(playerTable.ID)
+	gm.BroadcastState(playerTable.ID)
 
 }
 
@@ -424,7 +429,7 @@ func (gm *GameManager) NewGame(tableID string) {
 	}
 
 	playerTable.SetPositions()
-	playerTable.ShuffleDeck()
+	playerTable.Deck = playerTable.ShuffleDeck(eval.UnshuffledDeck)
 	playerTable.DistributeCards()
 	playerTable.SetBigBlindIndex()
 
@@ -458,50 +463,12 @@ func (gm *GameManager) HandleDealCards(table *table.Table) {
 	gm.BroadcastState(table.ID)
 }
 
-// similar to above this should be handled by server eventually
-// would be triggered when a table has done the full round after river
-// or when all active players cannot bet further IN TERMS OF DETERMINING WINNER
-// returns stringified hand and list of winners
-
-func (gm *GameManager) HandleEvaluateHands(t *table.Table) ([]string, []string) {
-	winners := []string{t.Players[0].PlayerID}
-	resHand, highest := t.Players[0].EvalHand(t)
-
-	for i := 1; i < len(t.Players); i++ {
-		player := t.Players[i]
-
-		if !player.PlayingHand {
-			continue
-		}
-
-		hand, val := player.EvalHand(t)
-		// val here means like two pair one pair etc
-
-		if val > highest {
-			log.Printf("New highest val of %d with hand %v", val, hand)
-			highest = val
-			resHand = hand
-			winners = []string{player.PlayerID}
-		} else if val == highest {
-			log.Printf("Same val of %d with hand %v", val, hand)
-			best := eval.HandleTie(hand, resHand)
-			if !reflect.DeepEqual(resHand, best) {
-				winners = []string{player.PlayerID}
-				resHand = best
-			} else {
-				winners = append(winners, player.PlayerID)
-			}
-		}
-	}
-
-	return resHand.Stringify(), winners
-}
-
 func (gm *GameManager) advanceBettingRound(t *table.Table) {
 	switch t.Round {
 	case table.PreFlop:
 		t.Round = table.Flop
 		t.ShowFlopCards()
+		t.SimulateOdds()
 		log.Println("Flop dealt")
 	case table.Flop:
 		t.Round = table.Turn
@@ -513,7 +480,7 @@ func (gm *GameManager) advanceBettingRound(t *table.Table) {
 		log.Println("River dealt")
 	case table.River:
 		log.Println("Betting round complete, ready to evaluate hands")
-		hand, winners := gm.HandleEvaluateHands(t)
+		hand, winners := t.HandleEvaluateHands()
 		log.Println("The winners are.... :", winners)
 		gm.BroadcastWinners(hand, winners, t.ID)
 		gm.NewGame(t.ID)

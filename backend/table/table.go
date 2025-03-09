@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"poker/eval"
+	"reflect"
 	"slices"
 	"strings"
 )
@@ -13,6 +14,7 @@ type Player struct {
 	PlayerID    string
 	HoleCards   [2]eval.Card
 	PlayingHand bool
+	Odds        float32
 }
 
 type BettingRound int
@@ -62,15 +64,15 @@ func (p Player) HoleCardNames() []string {
 	return eval.CardNames(p.HoleCards[:])
 }
 
-func (table *Table) ShuffleDeck() {
-	shuffledDeck := make([]eval.Card, len(eval.UnshuffledDeck))
-	copy(shuffledDeck, eval.UnshuffledDeck)
+func (table *Table) ShuffleDeck(deck []eval.Card) []eval.Card {
+	shuffledDeck := make([]eval.Card, len(deck))
+	copy(shuffledDeck, deck)
 
 	rand.Shuffle(len(shuffledDeck), func(i, j int) {
 		shuffledDeck[i], shuffledDeck[j] = shuffledDeck[j], shuffledDeck[i]
 	})
 
-	table.Deck = shuffledDeck
+	return shuffledDeck
 }
 
 func (table *Table) DistributeCards() {
@@ -191,6 +193,90 @@ func (t *Table) PrintTableDetails() {
 	fmt.Println(sb.String())
 }
 
-func (t Table) CommunityCardNames() []string {
-	return eval.CardNames(t.CommunityCards)
+func (t *Table) CommunityCardNames() []string {
+	names := eval.CardNames(t.CommunityCards)
+
+	if len(names) == 0 {
+		return []string{}
+	}
+
+	return names
+}
+
+func (t *Table) ValidBet(betSize int) bool {
+	return (t.MostRecentRaise.BetAmount == 0) || (t.MostRecentRaise.BetAmount*2 <= betSize)
+}
+
+// thinking for sims we do a map of players to wins
+// loop over like 1000 iterations for simulations with shuffled decks each time
+// eval the winner for each and then add that to the counter at the end loop over the map
+// and update the players odds field with (num wins / sims run)
+func (t *Table) SimulateOdds() {
+	numSimulations := 1000
+	wins := make(map[string]int)
+
+	// change to round based lol
+	n := len(t.CommunityCards)
+
+	fmt.Printf("cards that are static t.CommunityCards: %v\n", t.CommunityCards)
+	for i := 0; i < numSimulations; i++ {
+		newDeck := t.ShuffleDeck(t.Deck)
+		before := t.CommunityCards
+
+		if n == 3 {
+			t.CommunityCards = append(t.CommunityCards, []eval.Card{newDeck[0], newDeck[2]}...)
+		} else if n == 4 {
+			t.CommunityCards = append(t.CommunityCards, newDeck[0])
+		}
+
+		_, winners := t.HandleEvaluateHands()
+
+		for _, winner := range winners {
+			wins[winner] += 1
+		}
+
+		t.CommunityCards = before
+	}
+
+	for _, player := range t.Players {
+		player.Odds = float32(wins[player.PlayerID]) / float32(numSimulations)
+		fmt.Printf("Player %s has %f odds of winning", player.PlayerID, player.Odds)
+	}
+}
+
+// similar to above this should be handled by server eventually
+// would be triggered when a table has done the full round after river
+// or when all active players cannot bet further IN TERMS OF DETERMINING WINNER
+// returns stringified hand and list of winners
+func (t *Table) HandleEvaluateHands() ([]string, []string) {
+	winners := []string{t.Players[0].PlayerID}
+	// need to handle if player 1 has the best hand but wasnt playing it lol
+	resHand, highest := t.Players[0].EvalHand(t)
+
+	for i := 1; i < len(t.Players); i++ {
+		player := t.Players[i]
+
+		if !player.PlayingHand {
+			continue
+		}
+
+		hand, val := player.EvalHand(t)
+		// val here means like two pair one pair etc
+
+		if val > highest {
+			highest = val
+			resHand = hand
+			winners = []string{player.PlayerID}
+		} else if val == highest {
+			best := eval.HandleTie(hand, resHand)
+			if !reflect.DeepEqual(resHand, best) {
+				winners = []string{player.PlayerID}
+				resHand = best
+			} else {
+				winners = append(winners, player.PlayerID)
+			}
+		}
+	}
+
+	return resHand.Stringify(), winners
 }
