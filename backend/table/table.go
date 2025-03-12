@@ -14,7 +14,8 @@ type Player struct {
 	PlayerID    string
 	HoleCards   [2]eval.Card
 	PlayingHand bool
-	Odds        float32
+	WinOdds     float32
+	SplitOdds   float32
 }
 
 type BettingRound int
@@ -214,6 +215,7 @@ func (t *Table) ValidBet(betSize int) bool {
 func (t *Table) SimulateOdds() {
 	numSimulations := 1000
 	wins := make(map[string]int)
+	splits := make(map[string]int)
 
 	// change to round based lol
 	n := len(t.CommunityCards)
@@ -230,17 +232,22 @@ func (t *Table) SimulateOdds() {
 		}
 
 		_, winners := t.HandleEvaluateHands()
-
-		for _, winner := range winners {
-			wins[winner] += 1
+		if len(winners) > 1 {
+			for _, winner := range winners {
+				splits[winner] += 1
+				wins[winner] += 1
+			}
+		} else {
+			wins[winners[0]] += 1
 		}
 
 		t.CommunityCards = before
 	}
 
 	for _, player := range t.Players {
-		player.Odds = float32(wins[player.PlayerID]) / float32(numSimulations)
-		fmt.Printf("Player %s has %f odds of winning", player.PlayerID, player.Odds)
+		player.WinOdds = float32(wins[player.PlayerID]) / float32(numSimulations)
+		player.SplitOdds = float32(splits[player.PlayerID]) / float32(numSimulations)
+		fmt.Printf("Player %s has %f odds of winning and %f of splitting\n", player.PlayerID, player.WinOdds, player.SplitOdds)
 	}
 }
 

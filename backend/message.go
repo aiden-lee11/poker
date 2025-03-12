@@ -18,9 +18,11 @@ type GameEndMessage struct {
 }
 
 type PublicPlayerState struct {
-	PlayerID  string `json:"playerID"`
-	StackSize int    `json:"stackSize"`
-	Active    bool   `json:"active"`
+	PlayerID  string  `json:"playerID"`
+	StackSize int     `json:"stackSize"`
+	Active    bool    `json:"active"`
+	WinOdds   float32 `json:"winOdds"`
+	SplitOdds float32 `json:"splitOdds"`
 }
 
 type PublicGameState struct {

@@ -96,11 +96,14 @@ func (gm *GameManager) BroadcastState(tableID string) {
 	// Remake the array to ensure no data mismatches
 	publicPlayers := make([]PublicPlayerState, len(table.Players))
 
+	// for now will append the odds of the player in the public state cause why not :)
 	for i, p := range table.Players {
 		publicPlayers[i] = PublicPlayerState{
 			PlayerID:  p.PlayerID,
 			StackSize: p.StackSize,
 			Active:    p.PlayingHand,
+			WinOdds:   p.WinOdds,
+			SplitOdds: p.SplitOdds,
 		}
 	}
 
@@ -142,6 +145,10 @@ func (gm *GameManager) HandleJoin(client *Client, payload interface{}) {
 	// create or grab the table
 	playerTable := gm.CreateTable(tableID)
 
+	// to fix when a player in the lower slot leaves but the last player doesnt
+	// could resolve in a conflict where two players have the same player id
+	// possible fixes are to keep track of leavers and store array of useable ids
+	// if no useable ids then and only then assign playerID like below
 	playerID := "player-" + strconv.Itoa(len(playerTable.Players)+1)
 
 	stackSizeFloat, ok := params["stackSize"].(float64)
@@ -473,10 +480,12 @@ func (gm *GameManager) advanceBettingRound(t *table.Table) {
 	case table.Flop:
 		t.Round = table.Turn
 		t.ShowTurnCard()
+		t.SimulateOdds()
 		log.Println("Turn dealt")
 	case table.Turn:
 		t.Round = table.River
 		t.ShowRiverCard()
+		t.SimulateOdds()
 		log.Println("River dealt")
 	case table.River:
 		log.Println("Betting round complete, ready to evaluate hands")
