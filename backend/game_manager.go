@@ -98,6 +98,9 @@ func (gm *GameManager) BroadcastState(tableID string) {
 
 	// for now will append the odds of the player in the public state cause why not :)
 	for i, p := range table.Players {
+		if p == nil {
+			continue
+		}
 		publicPlayers[i] = PublicPlayerState{
 			PlayerID:  p.PlayerID,
 			StackSize: p.StackSize,
@@ -149,7 +152,15 @@ func (gm *GameManager) HandleJoin(client *Client, payload interface{}) {
 	// could resolve in a conflict where two players have the same player id
 	// possible fixes are to keep track of leavers and store array of useable ids
 	// if no useable ids then and only then assign playerID like below
+	fmt.Printf("playerTable.Players: %v\n", playerTable.Players)
+
+	n := len(playerTable.Players)
 	playerID := "player-" + strconv.Itoa(len(playerTable.Players)+1)
+	for i := 0; i < n; i++ {
+		if playerTable.Players[i] == nil {
+			playerID = "player-" + strconv.Itoa(i)
+		}
+	}
 
 	stackSizeFloat, ok := params["stackSize"].(float64)
 
@@ -218,6 +229,9 @@ func (gm *GameManager) HandleBet(client *Client, payload interface{}) {
 	amount := int(amountFloat)
 	var player *table.Player
 	for _, p := range playerTable.Players {
+		if p == nil {
+			continue
+		}
 		if p.PlayerID == client.playerID {
 			player = p
 			break
@@ -266,6 +280,9 @@ func (gm *GameManager) HandleCall(client *Client) {
 
 	var player *table.Player
 	for _, p := range playerTable.Players {
+		if p == nil {
+			continue
+		}
 		if p.PlayerID == client.playerID {
 			player = p
 			break
@@ -341,6 +358,9 @@ func (gm *GameManager) HandleFold(client *Client) {
 	}
 
 	for _, p := range playerTable.Players {
+		if p == nil {
+			continue
+		}
 		if p.PlayerID == client.playerID {
 			p.PlayingHand = false
 			break
@@ -351,6 +371,29 @@ func (gm *GameManager) HandleFold(client *Client) {
 
 	gm.AdvanceTurn(playerTable)
 	gm.BroadcastState(client.tableID)
+}
+
+func (gm *GameManager) HandleLeave(client *Client) {
+	playerTable, exists := gm.GetTable(client.tableID)
+
+	if !exists {
+		log.Println("table does not exist", client.tableID)
+		return
+	}
+
+	// deregister the client from the players
+	for i, player := range playerTable.Players {
+		if player == nil {
+			continue
+		}
+		if player.PlayerID == client.playerID {
+			playerTable.Players[i] = nil
+		}
+	}
+
+	log.Println("we left successfully")
+
+	gm.BroadcastState(playerTable.ID)
 }
 
 func (gm *GameManager) HandleInitGame(client *Client) {
@@ -408,6 +451,9 @@ func (gm *GameManager) BroadcastPrivate(tableID string) {
 	}
 
 	for _, player := range playerTable.Players {
+		if player == nil {
+			continue
+		}
 		privateState := PrivatePlayerState{
 			HoleCards: player.HoleCardNames(),
 		}

@@ -26,13 +26,14 @@ func handleConnections(hub *Hub, gm *GameManager, w http.ResponseWriter, r *http
 		conn: conn,
 		// fortnite
 		send: make(chan []byte),
-		hub:  hub, // assign the hub here
+		hub:  hub,
+		gm:   gm,
 	}
 
 	hub.register <- client
 
 	go client.writeMessages()
-	client.readMessages(gm)
+	client.readMessages()
 }
 
 func main() {

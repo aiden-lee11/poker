@@ -43,7 +43,7 @@ func (h *Hub) Run() {
 			// Only attempt to delete and close if still registered.
 			if _, exists := h.clients[client]; exists {
 				delete(h.clients, client)
-				close(client.send)
+				client.Close()
 			}
 			h.mu.Unlock()
 		case message := <-h.broadcast:
@@ -53,7 +53,7 @@ func (h *Hub) Run() {
 					if client.tableID == message.tableID {
 						if !h.safeSend(client.send, message.content) {
 							// If sending fails (likely due to a closed channel), remove the client.
-							close(client.send)
+							client.Close()
 							delete(h.clients, client)
 						}
 					}
@@ -62,7 +62,7 @@ func (h *Hub) Run() {
 				for client := range h.clients {
 					if client.playerID == message.playerID && client.tableID == message.tableID {
 						if !h.safeSend(client.send, message.content) {
-							close(client.send)
+							client.Close()
 							delete(h.clients, client)
 						}
 					}

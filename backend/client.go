@@ -11,6 +11,7 @@ import (
 type Client struct {
 	hub       *Hub
 	conn      *websocket.Conn
+	gm        *GameManager
 	send      chan []byte
 	playerID  string
 	tableID   string
@@ -28,6 +29,8 @@ func (c *Client) Close() {
 			default:
 			}
 		}
+
+		c.gm.HandleLeave(c)
 		// Close the send channel.
 		close(c.send)
 		// Finally, close the websocket connection.
@@ -37,7 +40,7 @@ func (c *Client) Close() {
 
 // readMessages reads messages from the client.
 // It defers the Close() to ensure that cleanup happens only once.
-func (c *Client) readMessages(gm *GameManager) {
+func (c *Client) readMessages() {
 	// Ensure cleanup happens when this function exits.
 	defer c.Close()
 
@@ -56,17 +59,17 @@ func (c *Client) readMessages(gm *GameManager) {
 
 		switch gameMsg.Type {
 		case "join":
-			gm.HandleJoin(c, gameMsg.Payload)
+			c.gm.HandleJoin(c, gameMsg.Payload)
 		case "bet":
-			gm.HandleBet(c, gameMsg.Payload)
+			c.gm.HandleBet(c, gameMsg.Payload)
 		case "call":
-			gm.HandleCall(c)
+			c.gm.HandleCall(c)
 		case "check":
-			gm.HandleCheck(c)
+			c.gm.HandleCheck(c)
 		case "fold":
-			gm.HandleFold(c)
+			c.gm.HandleFold(c)
 		case "init":
-			gm.HandleInitGame(c)
+			c.gm.HandleInitGame(c)
 		default:
 			log.Println("unknown command type:", gameMsg.Type)
 		}
