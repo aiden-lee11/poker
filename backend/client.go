@@ -15,7 +15,7 @@ type Client struct {
 	send      chan []byte
 	playerID  string
 	tableID   string
-	closeOnce sync.Once // ensures Close() only runs once
+	closeOnce sync.Once
 }
 
 // Close safely unregisters the client and closes the connection.

@@ -276,6 +276,8 @@ func (t *Table) HandleEvaluateHands() ([]string, []string) {
 			winners = []string{player.PlayerID}
 		} else if val == highest {
 			best := eval.HandleTie(hand, resHand)
+			// Sort resHand to ensure stable comparison since HandleTie sorts both hands
+			resHand.SortHand()
 			if !reflect.DeepEqual(resHand, best) {
 				winners = []string{player.PlayerID}
 				resHand = best
